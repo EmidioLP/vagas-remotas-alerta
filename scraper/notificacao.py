@@ -21,10 +21,14 @@ from .models import Job
 
 logger = logging.getLogger(__name__)
 
-# Limites do Discord: 10 embeds por mensagem, 1024 caracteres por campo.
+# Limites do Discord: 10 embeds por mensagem, 1024 caracteres por campo e
+# 6000 caracteres somando TODOS os embeds da mesma mensagem. O ultimo e o
+# facil de esquecer: dez vagas com requisitos e beneficios passam dele com
+# folga, e o Discord recusa a mensagem inteira com HTTP 400.
 LIMITE_POR_MENSAGEM = 10
 LIMITE_CAMPO = 1000
 LIMITE_DESCRICAO = 3800
+ORCAMENTO_MENSAGEM = 5800
 
 # Titulos de secao que os portais usam dentro da descricao. A Gupy e a mais
 # consistente ("Responsabilidades e atribuicoes", "Requisitos e qualificacoes",
@@ -162,17 +166,48 @@ def montar_embed(job: Job) -> dict:
     return embed
 
 
-def montar_mensagens(novas: list[Job], titulo: str) -> list[dict]:
-    """Payloads do webhook. O Discord aceita ate 10 embeds por mensagem."""
-    mensagens: list[dict] = []
-    total_lotes = (len(novas) - 1) // LIMITE_POR_MENSAGEM + 1 if novas else 0
+def _tamanho_embed(embed: dict) -> int:
+    """Caracteres que o Discord soma no orcamento da mensagem."""
+    total = len(embed.get("title", "")) + len(embed.get("description", ""))
+    total += len(embed.get("footer", {}).get("text", ""))
+    for campo in embed.get("fields", []):
+        total += len(campo["name"]) + len(campo["value"])
+    return total
 
-    for indice, inicio in enumerate(range(0, len(novas), LIMITE_POR_MENSAGEM), start=1):
-        lote = novas[inicio:inicio + LIMITE_POR_MENSAGEM]
-        cabecalho = titulo if total_lotes == 1 else f"{titulo} ({indice}/{total_lotes})"
+
+def montar_mensagens(novas: list[Job], titulo: str) -> list[dict]:
+    """Payloads do webhook, fatiados pelos dois limites do Discord.
+
+    Fatiar so pela contagem de embeds nao basta: uma vaga com requisitos,
+    responsabilidades e beneficios passa de 3000 caracteres sozinha, entao
+    o lote de dez estoura o teto de 6000 e a mensagem inteira volta 400.
+    Aqui o lote fecha no que vier primeiro -- dez embeds ou o orcamento.
+    """
+    lotes: list[list[dict]] = []
+    atual: list[dict] = []
+    tamanho = 0
+
+    for job in novas:
+        embed = montar_embed(job)
+        custo = _tamanho_embed(embed)
+        # `atual and` garante que um embed sozinho maior que o orcamento vá
+        # numa mensagem propria, em vez de travar o laco ou sumir do aviso.
+        if atual and (len(atual) >= LIMITE_POR_MENSAGEM
+                      or tamanho + custo > ORCAMENTO_MENSAGEM):
+            lotes.append(atual)
+            atual, tamanho = [], 0
+        atual.append(embed)
+        tamanho += custo
+
+    if atual:
+        lotes.append(atual)
+
+    mensagens = []
+    for indice, lote in enumerate(lotes, start=1):
+        cabecalho = titulo if len(lotes) == 1 else f"{titulo} ({indice}/{len(lotes)})"
         mensagens.append({
             "content": f"**{cabecalho}** — {len(lote)} vaga(s)",
-            "embeds": [montar_embed(job) for job in lote],
+            "embeds": lote,
         })
     return mensagens
 

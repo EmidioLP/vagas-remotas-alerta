@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 
+from scraper import notificacao
 from scraper.models import Job
 from scraper.notificacao import (
     LIMITE_POR_MENSAGEM,
+    ORCAMENTO_MENSAGEM,
+    _tamanho_embed,
     carregar_vistas,
     enviar,
     extrair_secao,
@@ -176,6 +179,40 @@ def test_cada_vaga_vira_um_embed_respeitando_o_limite():
     mensagens = montar_mensagens(jobs, "Novas")
     assert all(len(m["embeds"]) <= 10 for m in mensagens)
     assert sum(len(m["embeds"]) for m in mensagens) == len(jobs)
+
+
+def _job_gordo(ext):
+    """Vaga do tamanho real de uma da Gupy: todas as seções preenchidas."""
+    descricao = (
+        "Responsabilidades e atribuições " + "manter a plataforma " * 60
+        + "Requisitos e qualificações " + "Python, SQL e Docker " * 60
+        + "Informações adicionais " + "vale refeição e plano de saúde " * 40
+    )
+    return _job(ext, description=descricao, company="Empresa Exemplo",
+                location="São Paulo, SP", url=f"https://exemplo.test/{ext}")
+
+
+def test_mensagem_respeita_o_orcamento_de_caracteres():
+    """Dez vagas cheias estouram os 6000 do Discord; o lote tem que fechar antes."""
+    mensagens = montar_mensagens([_job_gordo(str(i)) for i in range(12)], "Novas")
+    for mensagem in mensagens:
+        soma = sum(_tamanho_embed(e) for e in mensagem["embeds"])
+        assert soma <= ORCAMENTO_MENSAGEM, f"{soma} caracteres na mensagem"
+
+
+def test_vagas_gordas_geram_mais_de_um_lote_e_nenhuma_some():
+    jobs = [_job_gordo(str(i)) for i in range(12)]
+    mensagens = montar_mensagens(jobs, "Novas")
+    assert len(mensagens) > 2, "o corte por caracteres não aconteceu"
+    assert sum(len(m["embeds"]) for m in mensagens) == len(jobs)
+
+
+def test_embed_maior_que_o_orcamento_vai_sozinho_e_nao_some(monkeypatch):
+    """Sem o caso-base, um embed acima do teto fecharia lotes vazios em laço."""
+    monkeypatch.setattr(notificacao, "ORCAMENTO_MENSAGEM", 10)
+    jobs = [_job_gordo("1"), _job_gordo("2"), _job_gordo("3")]
+    mensagens = montar_mensagens(jobs, "Novas")
+    assert [len(m["embeds"]) for m in mensagens] == [1, 1, 1]
 
 
 class _RespostaFalsa:
