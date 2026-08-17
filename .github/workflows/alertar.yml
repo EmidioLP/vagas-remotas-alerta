@@ -1,0 +1,69 @@
+# Coleta vagas junior remotas a cada tres dias e avisa no Discord so as novas.
+#
+# O estado de "ja avisada" e commitado de volta ao repositorio: o runner e
+# descartado ao terminar, entao sem isso toda execucao reavisaria tudo.
+#
+# A ProgramaThor nao esta entre as fontes de proposito -- ela responde 403 a
+# partir de IP de datacenter, o que foi medido antes de montar este workflow.
+# As demais respondem normalmente do runner, inclusive o LinkedIn.
+
+name: Alertar vagas remotas
+
+on:
+  schedule:
+    # A cada tres dias, 09:00 UTC = 06:00 em Brasilia. O horario e aproximado:
+    # o agendador do GitHub atrasa quando a fila esta cheia.
+    - cron: "0 9 */3 * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Só mostrar as vagas novas, sem enviar ao Discord"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  # Duas execucoes simultaneas dariam conflito ao commitar o estado.
+  group: alertar-vagas
+  cancel-in-progress: false
+
+jobs:
+  alertar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Coletar e avisar
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python alerta.py --dry-run
+          else
+            python alerta.py
+          fi
+
+      - name: Guardar o estado para a próxima execução
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          if git diff --quiet -- state/; then
+            echo "Nenhuma vaga nova; estado inalterado."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git commit -m "Atualiza as vagas já avisadas [skip ci]"
+          git push

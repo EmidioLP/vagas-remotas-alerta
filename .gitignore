@@ -1,0 +1,26 @@
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# Bytecode
+__pycache__/
+*.py[cod]
+
+# Testes
+.pytest_cache/
+.coverage
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Segredos -- o webhook do Discord NUNCA entra no repositorio
+.env
+.env.*
+
+# O estado de vagas ja avisadas E versionado de proposito (state/), porque o
+# runner do GitHub Actions e descartado a cada execucao.
