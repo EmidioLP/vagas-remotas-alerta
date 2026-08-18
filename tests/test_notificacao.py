@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from scraper import notificacao
 from scraper.models import Job
 from scraper.notificacao import (
@@ -16,6 +18,7 @@ from scraper.notificacao import (
     montar_embed,
     montar_mensagens,
     salvar_vistas,
+    url_valida,
     separar_novas,
 )
 
@@ -179,6 +182,39 @@ def test_cada_vaga_vira_um_embed_respeitando_o_limite():
     mensagens = montar_mensagens(jobs, "Novas")
     assert all(len(m["embeds"]) <= 10 for m in mensagens)
     assert sum(len(m["embeds"]) for m in mensagens) == len(jobs)
+
+
+def test_url_com_host_invalido_nao_vira_link():
+    """A Gupy publica painel desativado como "empresa&id&inactive.gupy.io"."""
+    ruim = "https://terras&15719&inactive.gupy.io/job/abc"
+    embed = montar_embed(_job("1", url=ruim))
+    assert "url" not in embed, "URL malformada derruba a mensagem inteira no Discord"
+    assert embed["title"], "a vaga continua aparecendo, só que sem link"
+
+
+def test_url_boa_continua_virando_link():
+    embed = montar_embed(_job("1", url="https://empresa.gupy.io/job/123?x=1"))
+    assert embed["url"] == "https://empresa.gupy.io/job/123?x=1"
+
+
+@pytest.mark.parametrize("url", [
+    "https://terras&15719&inactive.gupy.io/job/abc",
+    "/vagas/relativa",
+    "javascript:alert(1)",
+    "https://exemplo .test/vaga",
+    "",
+])
+def test_urls_recusadas(url):
+    assert not url_valida(url)
+
+
+@pytest.mark.parametrize("url", [
+    "https://www.vagas.com.br/vagas/v123",
+    "http://exemplo.test:8080/vaga",
+    "https://empresa-x.gupy.io/job/eyJqb2JJZCI6MX0=?jobBoardSource=gupy_portal",
+])
+def test_urls_aceitas(url):
+    assert url_valida(url)
 
 
 def _job_gordo(ext):

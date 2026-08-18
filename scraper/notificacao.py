@@ -16,6 +16,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .models import Job
 
@@ -29,6 +30,12 @@ LIMITE_POR_MENSAGEM = 10
 LIMITE_CAMPO = 1000
 LIMITE_DESCRICAO = 3800
 ORCAMENTO_MENSAGEM = 5800
+
+# Uma URL malformada faz o Discord recusar a MENSAGEM INTEIRA, com um 400 que
+# aponta so o indice do embed. A Gupy publica painel desativado como
+# "empresa&id&inactive.gupy.io" -- host que nao passa na validacao deles --,
+# entao a URL e conferida antes de virar link.
+HOST_VALIDO = re.compile(r"^[A-Za-z0-9.-]+(:\d+)?$")
 
 # Titulos de secao que os portais usam dentro da descricao. A Gupy e a mais
 # consistente ("Responsabilidades e atribuicoes", "Requisitos e qualificacoes",
@@ -131,6 +138,12 @@ def _campo(nome: str, valor: str, inline: bool = False) -> dict | None:
     return {"name": nome, "value": valor, "inline": inline}
 
 
+def url_valida(url: str) -> bool:
+    """Link que o Discord aceita: http(s) e host sem caractere estranho."""
+    partes = urlsplit(url or "")
+    return partes.scheme in ("http", "https") and bool(HOST_VALIDO.match(partes.netloc))
+
+
 def montar_embed(job: Job) -> dict:
     """Um embed por vaga, com tudo que o portal informou sobre ela."""
     campos = [
@@ -154,7 +167,13 @@ def montar_embed(job: Job) -> dict:
         "footer": {"text": f"via {job.source}"},
     }
     if job.url:
-        embed["url"] = job.url
+        if url_valida(job.url):
+            embed["url"] = job.url
+        else:
+            # Sem link a vaga ainda aparece; com link quebrado, some a mensagem
+            # inteira -- inclusive as outras vagas que iam junto.
+            logger.warning("URL malformada (%s); embed vai sem link: %s",
+                           job.source, job.url)
 
     # Se o portal nao publica secoes (LinkedIn), mostra o inicio da descricao
     # para a mensagem nao ficar so com metadados.
