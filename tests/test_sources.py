@@ -104,7 +104,8 @@ def test_vagas_parse_page():
     assert job.company == "HStern"
     assert job.url == "https://www.vagas.com.br/vagas/v2824782/desenvolvedor-de-software-jr"
     assert job.location == "Rio de Janeiro / RJ"
-    assert job.published_date == "09/07/2026"
+    # O card vem "09/07/2026"; o portal e o unico que nao publica em ISO.
+    assert job.published_date == "2026-07-09"
     # "Júnior/Trainee" (span.nivelVaga) e senioridade, nao modalidade de trabalho.
     assert job.workplace_type == "Não informado"
 

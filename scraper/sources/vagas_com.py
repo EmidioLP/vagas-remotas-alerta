@@ -22,6 +22,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..datas import normalizar_data
 from ..models import NAO_INFORMADO, REMOTO, Job, normalize
 from .base import JobSource
 
@@ -96,7 +97,8 @@ class VagasComSource(JobSource):
                     description=self._text(card.select_one("div.detalhes")),
                     location=location,
                     workplace_type=self._workplace(location),
-                    published_date=self._text(card.select_one("span.data-publicacao")),
+                    published_date=normalizar_data(
+                        self._text(card.select_one("span.data-publicacao"))),
                     search_term=term,
                 )
             )

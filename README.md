@@ -70,6 +70,7 @@ python alerta.py
 | `--dry-run` | Mostra as vagas novas sem enviar nem gravar estado |
 | `--sources gupy linkedin` | Escolhe os portais |
 | `--terms "..." "..."` | Substitui os termos de busca |
+| `--dias N` | Idade máxima da vaga, em dias (padrão 60; `0` desliga) |
 | `--todas-modalidades` | Não filtra por remoto |
 | `--max-pages N` | Páginas por termo, por portal (padrão 5) |
 | `--delay S` | Segundos entre requisições (padrão 2) |
@@ -123,10 +124,23 @@ deduplicação                  → por id do portal, depois por título+empresa
    ↓
 portão de relevância tech     → descarta "Analista Contábil Jr" e afins
    ↓
+filtro de idade               → descarta o que passou de 60 dias
+   ↓
 filtro de remotas             → só o que o portal AFIRMA ser remoto
    ↓
 diff com o estado             → sobram as que você ainda não viu
 ```
+
+O filtro de idade existe porque portal não tira anúncio velho do ar: numa
+coleta real vieram vagas de 2022, de painel de carreira já desativado. Vaga
+**sem** data informada fica — não dá para provar que é velha. É o oposto do
+filtro de remotas, onde a falta de informação derruba a vaga: ali o silêncio
+esconderia uma presencial, aqui esconderia só a idade.
+
+Só o Vagas.com não publica a data em ISO — ele mistura `03/08/2026` com texto
+relativo (`Há 5 dias`, `Hoje`), convertido na coleta. `Há mais de 30 dias` vira
+exatamente 30: é o piso que o portal garante, e arredondar para mais inventaria
+idade que ele não afirma.
 
 O filtro de remotas descarta vagas sem modalidade informada: *"não informado"
 não é prova de remoto. Isso corta bastante — o LinkedIn e o Vagas.com não

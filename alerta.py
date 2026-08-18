@@ -47,6 +47,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help=f"Arquivo de estado (padrão: {ESTADO_PADRAO}).")
     parser.add_argument("--titulo", default="Novas vagas júnior remotas",
                         help="Título do aviso no Discord.")
+    parser.add_argument("--dias", type=int, default=60,
+                        help="Idade máxima da vaga em dias (0 desliga).")
     parser.add_argument("--todas-modalidades", action="store_true",
                         help="Não filtrar por remoto (padrão é só remotas).")
     parser.add_argument("--dry-run", action="store_true",
@@ -71,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         delay_seconds=args.delay,
         max_pages_per_term=args.max_pages,
         somente_remotas=not args.todas_modalidades,
+        dias_max=args.dias,
     )
 
     jobs = coletar_vagas(settings)

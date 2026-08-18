@@ -63,6 +63,9 @@ class Settings:
     # Mantem so as vagas que o portal AFIRMA ser remotas. Vagas sem modalidade
     # informada sao descartadas: "nao informado" nao e prova de remoto.
     somente_remotas: bool = True
+    # Portal nao tira anuncio velho do ar: a coleta trouxe vaga de 2022.
+    # 0 desliga o filtro.
+    dias_max: int = 60
 
     def ensure_output_dir(self) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)

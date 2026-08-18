@@ -11,6 +11,7 @@ import logging
 
 from .classifier import classify_jobs, default_classifier, filter_tech
 from .config import Settings
+from .datas import filtrar_recentes
 from .dedupe import deduplicate
 from .http_client import PoliteSession
 from .models import REMOTO, Job
@@ -59,6 +60,12 @@ def coletar_vagas(settings: Settings) -> list[Job]:
     antes = len(jobs)
     jobs, _ = filter_tech(jobs, default_classifier())
     logger.info("De tecnologia: %d (-%d)", len(jobs), antes - len(jobs))
+
+    if settings.dias_max > 0:
+        antes = len(jobs)
+        jobs = filtrar_recentes(jobs, settings.dias_max)
+        logger.info("Publicadas nos ultimos %d dias: %d (-%d)",
+                    settings.dias_max, len(jobs), antes - len(jobs))
 
     if settings.somente_remotas:
         antes = len(jobs)
