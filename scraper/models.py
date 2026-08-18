@@ -86,6 +86,10 @@ class Job:
     workplace_type: str = ""
     published_date: str = ""
     search_term: str = ""
+    # Slug do local consultado, quando a vaga veio de uma busca por local.
+    # O Trampos nao publica a cidade na listagem: sem isso, o que veio da
+    # consulta por RN seria descartado no filtro logo adiante.
+    local_consultado: str = ""
     # Preenchidos pelo pipeline:
     area: str = ""
     area_score: float = 0.0

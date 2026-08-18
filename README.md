@@ -1,8 +1,8 @@
 # vagas-remotas-alerta
 
-Bot que procura **vagas júnior remotas** em cinco portais a cada três dias e
-avisa no Discord **apenas as que ainda não foram mostradas** — para candidatar-se
-sem precisar revisitar site nenhum.
+Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
+Norte** — em cinco portais a cada três dias e avisa no Discord **apenas as que
+ainda não foram mostradas**, para candidatar-se sem revisitar site nenhum.
 
 Roda sozinho no GitHub Actions. Não precisa de servidor.
 
@@ -71,6 +71,7 @@ python alerta.py
 | `--sources gupy linkedin` | Escolhe os portais |
 | `--terms "..." "..."` | Substitui os termos de busca |
 | `--dias N` | Idade máxima da vaga, em dias (padrão 60; `0` desliga) |
+| `--locais rn` | Onde vaga presencial serve (padrão `rn`); sem valor = só remotas |
 | `--todas-modalidades` | Não filtra por remoto |
 | `--max-pages N` | Páginas por termo, por portal (padrão 5) |
 | `--delay S` | Segundos entre requisições (padrão 2) |
@@ -126,7 +127,7 @@ portão de relevância tech     → descarta "Analista Contábil Jr" e afins
    ↓
 filtro de idade               → descarta o que passou de 60 dias
    ↓
-filtro de remotas             → só o que o portal AFIRMA ser remoto
+filtro de local               → remota de qualquer lugar, OU presencial no RN
    ↓
 diff com o estado             → sobram as que você ainda não viu
 ```
@@ -141,6 +142,41 @@ Só o Vagas.com não publica a data em ISO — ele mistura `03/08/2026` com text
 relativo (`Há 5 dias`, `Hoje`), convertido na coleta. `Há mais de 30 dias` vira
 exatamente 30: é o piso que o portal garante, e arredondar para mais inventaria
 idade que ele não afirma.
+
+## Presencial no Rio Grande do Norte
+
+Além das remotas de qualquer lugar, entram as vagas do RN em qualquer
+modalidade — presencial, híbrida ou não informada. Aqui o **local** é a prova,
+e a modalidade não precisa ser afirmada: se dá para ir até lá, serve.
+
+Isso exige **buscar** por localização, não só filtrar: numa coleta com as
+buscas nacionais, das 364 vagas encontradas exatamente **1** era do RN. Cada
+portal quer a localização num formato próprio, e todos foram medidos contra a
+API antes de virar código:
+
+| Portal | Como pedir o local |
+|---|---|
+| **Gupy** | `state=Rio Grande do Norte` — por extenso; `state=RN` devolve zero |
+| **LinkedIn** | `geoId=104863467`, obtido do typeahead do próprio portal |
+| **Vagas.com** | caminho por cidade: `/vagas-em-natal-rn` |
+| **Trampos** | `lc=Rio Grande do Norte`, texto livre |
+| **We Work Remotely** | fica de fora — é um feed de vagas remotas globais |
+
+A busca por local repete **os mesmos termos** da busca nacional, e isso não é
+detalhe. Consultar o estado inteiro sem termo foi tentado primeiro e trouxe
+"Estagiário de Manutenção Industrial" — o portão de relevância o aceitou porque
+a descrição cita Excel e SAP. Com os termos, a consulta por local tem a mesma
+precisão da nacional: numa coleta real, 5 vagas do RN, todas de tecnologia.
+
+O reconhecimento do local no texto aceita `RN`, `Rio Grande do Norte`, `Natal`
+e `Mossoró`. Cidade homônima ficou de fora de propósito — `Parnamirim` também é
+município de Pernambuco, e `Santa Cruz` existe em vários estados. As outras
+cidades do RN entram mesmo assim, porque os portais escrevem o estado junto
+("Parnamirim, Rio Grande do Norte").
+
+O Trampos é o caso especial: a listagem dele não traz cidade nenhuma. Para essas
+vagas, a prova é terem vindo da consulta por RN — sem isso, tudo que o filtro
+por local trouxesse desse portal seria descartado na linha seguinte.
 
 O filtro de remotas descarta vagas sem modalidade informada: *"não informado"
 não é prova de remoto. Isso corta bastante — o LinkedIn e o Vagas.com não

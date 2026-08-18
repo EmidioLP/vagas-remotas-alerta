@@ -23,6 +23,7 @@ import re
 from bs4 import BeautifulSoup
 
 from ..datas import normalizar_data
+from ..locais import Local
 from ..models import NAO_INFORMADO, REMOTO, Job, normalize
 from .base import JobSource
 
@@ -42,16 +43,30 @@ class VagasComSource(JobSource):
     label = "Vagas.com.br"
 
     def fetch_term(self, term: str) -> list[Job]:
+        return self._paginar(f"{BASE_URL}/vagas-de-{slugify_term(term)}", term=term)
+
+    def fetch_local(self, local: Local, terms: list[str]) -> list[Job]:
+        """Listagem da cidade inteira: /vagas-em-natal-rn.
+
+        Sem termo de proposito -- juntar termo e cidade
+        (`/vagas-de-ti-em-natal-rn`) devolve pagina vazia neste portal.
+        """
+        jobs: list[Job] = []
+        for cidade in local.vagas_cidades:
+            jobs.extend(self._paginar(f"{BASE_URL}/vagas-em-{cidade}",
+                                      local_slug=local.slug))
+        return jobs
+
+    def _paginar(self, url: str, term: str = "", local_slug: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen_ids: set[str] = set()
-        url = f"{BASE_URL}/vagas-de-{slugify_term(term)}"
 
         for page in range(1, self.settings.max_pages_per_term + 1):
             response = self.session.get(url, params={"pagina": page})
             if response is None:
                 break
 
-            batch = self._parse_page(response.text, term)
+            batch = self._parse_page(response.text, term, local_slug)
             if not batch:
                 break  # sem mais resultados
 
@@ -68,7 +83,8 @@ class VagasComSource(JobSource):
 
         return jobs
 
-    def _parse_page(self, html: str, term: str) -> list[Job]:
+    def _parse_page(self, html: str, term: str,
+                    local_slug: str = "") -> list[Job]:
         soup = BeautifulSoup(html, "html.parser")
         jobs: list[Job] = []
 
@@ -100,6 +116,7 @@ class VagasComSource(JobSource):
                     published_date=normalizar_data(
                         self._text(card.select_one("span.data-publicacao"))),
                     search_term=term,
+                    local_consultado=local_slug,
                 )
             )
         return jobs

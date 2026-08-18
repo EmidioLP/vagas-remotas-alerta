@@ -12,6 +12,7 @@ import logging
 from .classifier import classify_jobs, default_classifier, filter_tech
 from .config import Settings
 from .datas import filtrar_recentes
+from .locais import resolver, serve_presencialmente
 from .dedupe import deduplicate
 from .http_client import PoliteSession
 from .models import REMOTO, Job
@@ -69,8 +70,15 @@ def coletar_vagas(settings: Settings) -> list[Job]:
 
     if settings.somente_remotas:
         antes = len(jobs)
-        jobs = [j for j in jobs if j.workplace_type == REMOTO]
-        logger.info("Remotas: %d (-%d)", len(jobs), antes - len(jobs))
+        locais = resolver(settings.locais_presenciais)
+        # Remota de qualquer lugar, ou presencial/hibrida onde da para ir.
+        jobs = [j for j in jobs
+                if j.workplace_type == REMOTO or serve_presencialmente(j, locais)]
+        if locais:
+            logger.info("Remotas ou em %s: %d (-%d)",
+                        "/".join(l.uf for l in locais), len(jobs), antes - len(jobs))
+        else:
+            logger.info("Remotas: %d (-%d)", len(jobs), antes - len(jobs))
 
     jobs = classify_jobs(jobs, default_classifier())
     return attach_skills(jobs)

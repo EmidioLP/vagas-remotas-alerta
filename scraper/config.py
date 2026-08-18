@@ -66,6 +66,9 @@ class Settings:
     # Portal nao tira anuncio velho do ar: a coleta trouxe vaga de 2022.
     # 0 desliga o filtro.
     dias_max: int = 60
+    # Locais onde vaga presencial ou hibrida tambem serve, alem das remotas
+    # de qualquer lugar. Lista vazia = so remotas.
+    locais_presenciais: list[str] = field(default_factory=lambda: ["rn"])
 
     def ensure_output_dir(self) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)

@@ -29,6 +29,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from ..locais import Local
 from ..models import NAO_INFORMADO, REMOTO, Job, normalize
 from .base import JobSource
 
@@ -53,6 +54,21 @@ class LinkedInSource(JobSource):
     label = "LinkedIn Jobs"
 
     def fetch_term(self, term: str) -> list[Job]:
+        return self._paginar(keywords=term, geo_id=GEO_ID_BRASIL, term=term)
+
+    def fetch_local(self, local: Local, terms: list[str]) -> list[Job]:
+        """Os mesmos termos, trocando o geoId do Brasil pelo do local."""
+        if not local.linkedin_geo_id:
+            return []
+        jobs: list[Job] = []
+        for term in terms:
+            jobs.extend(self._paginar(keywords=term,
+                                      geo_id=local.linkedin_geo_id,
+                                      term=term, local_slug=local.slug))
+        return jobs
+
+    def _paginar(self, keywords: str, geo_id: str, term: str = "",
+                 local_slug: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen: set[str] = set()
 
@@ -60,15 +76,15 @@ class LinkedInSource(JobSource):
             response = self.session.get(
                 API_URL,
                 params={
-                    "keywords": term,
-                    "geoId": GEO_ID_BRASIL,
+                    "keywords": keywords,
+                    "geoId": geo_id,
                     "start": page * RESULTADOS_POR_PAGINA,
                 },
             )
             if response is None:
                 break
 
-            batch = self._parse_page(response.text, term)
+            batch = self._parse_page(response.text, term, local_slug)
             if not batch:
                 break
 
@@ -85,16 +101,18 @@ class LinkedInSource(JobSource):
 
         return jobs
 
-    def _parse_page(self, html: str, term: str) -> list[Job]:
+    def _parse_page(self, html: str, term: str,
+                    local_slug: str = "") -> list[Job]:
         soup = BeautifulSoup(html, "html.parser")
         jobs: list[Job] = []
         for card in soup.select("div.base-card"):
-            job = self._parse_card(card, term)
+            job = self._parse_card(card, term, local_slug)
             if job is not None:
                 jobs.append(job)
         return jobs
 
-    def _parse_card(self, card, term: str) -> Job | None:
+    def _parse_card(self, card, term: str,
+                    local_slug: str = "") -> Job | None:
         urn = card.get("data-entity-urn") or ""
         match = _ID_RE.search(urn)
         title = self._text(card.select_one("h3.base-search-card__title"))
@@ -120,6 +138,7 @@ class LinkedInSource(JobSource):
             workplace_type=self._modalidade(location),
             published_date=publicada[:10],
             search_term=term,
+            local_consultado=local_slug,
         )
 
     @staticmethod

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 
+from ..locais import Local
 from ..models import Job, normalize_workplace
 from .base import JobSource
 
@@ -33,6 +34,21 @@ class GupySource(JobSource):
     label = "Gupy (portal.gupy.io)"
 
     def fetch_term(self, term: str) -> list[Job]:
+        return self._paginar({"jobName": term}, term=term)
+
+    def fetch_local(self, local: Local, terms: list[str]) -> list[Job]:
+        """Vagas do estado. `state=RN` devolve zero: a API quer o nome todo."""
+        if not local.gupy_state:
+            return []
+        jobs: list[Job] = []
+        for term in terms:
+            jobs.extend(self._paginar(
+                {"jobName": term, "state": local.gupy_state},
+                term=term, local_slug=local.slug))
+        return jobs
+
+    def _paginar(self, filtro: dict, term: str = "",
+                 local_slug: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen_ids: set[str] = set()
         limit = min(self.settings.page_size, MAX_LIMIT)
@@ -41,7 +57,7 @@ class GupySource(JobSource):
             offset = page * limit
             payload = self.session.get_json(
                 API_URL,
-                params={"jobName": term, "limit": limit, "offset": offset},
+                params={**filtro, "limit": limit, "offset": offset},
             )
             if not payload:
                 break
@@ -52,7 +68,7 @@ class GupySource(JobSource):
 
             new_in_page = 0
             for raw in batch:
-                job = self._parse(raw, term)
+                job = self._parse(raw, term, local_slug)
                 if job is None or job.external_id in seen_ids:
                     continue
                 seen_ids.add(job.external_id)
@@ -66,7 +82,8 @@ class GupySource(JobSource):
 
         return jobs
 
-    def _parse(self, raw: dict, term: str) -> Job | None:
+    def _parse(self, raw: dict, term: str,
+               local_slug: str = "") -> Job | None:
         job_id = raw.get("id")
         title = raw.get("name")
         if job_id is None or not title:
@@ -93,4 +110,5 @@ class GupySource(JobSource):
             ),
             published_date=(raw.get("publishedDate") or "")[:10],
             search_term=term,
+            local_consultado=local_slug,
         )
