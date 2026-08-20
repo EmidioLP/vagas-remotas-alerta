@@ -203,3 +203,18 @@ O código de coleta e classificação vem do
 de análise que responde "qual área de tecnologia mais contrata júnior no
 Brasil". Aquele gera CSVs, gráficos e uma API; este aqui é o oposto — não
 guarda histórico nem publica nada, só avisa o que apareceu de novo.
+
+---
+
+## Licença
+
+[MIT](LICENSE) — use, modifique e redistribua à vontade, mantendo o aviso de
+copyright.
+
+A licença cobre **o código deste repositório**, não as vagas coletadas. Elas
+pertencem aos portais e às empresas que as publicaram, e raspá-las está sujeito
+aos termos de uso de cada site, que a licença não altera.
+
+Nenhuma vaga é versionada aqui: o `state/vagas_vistas.json` guarda só os
+identificadores das que já foram avisadas (`fonte:id`), sem título, empresa nem
+descrição.
