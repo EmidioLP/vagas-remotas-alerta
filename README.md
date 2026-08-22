@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte** — em cinco portais a cada três dias e avisa no Discord **apenas as que
+Norte** — em seis portais a cada três dias e avisa no Discord **apenas as que
 ainda não foram mostradas**, para candidatar-se sem revisitar site nenhum.
 
 Roda sozinho no GitHub Actions. Não precisa de servidor.
@@ -88,6 +88,31 @@ python alerta.py
 | **LinkedIn Jobs** | API de convidado, sem login (`geoId` do Brasil) |
 | **Trampos.co** | API JSON pública que a SPA consome |
 | **We Work Remotely** | Feeds RSS por categoria (vagas globais) |
+| **GeekHunter** | Sitemap e páginas de vaga em HTML, com dados JobPosting |
+
+A GeekHunter é coletada de um jeito diferente das outras cinco, e a diferença
+vem do `robots.txt` dela:
+
+```
+Disallow: /api/
+Disallow: /feeds/
+```
+
+As superfícies de máquina são proibidas em texto explícito — a técnica usada na
+Gupy e no Trampos, de consumir a API JSON que o front chama, está fora de
+questão aqui. O mesmo arquivo aponta a superfície pretendida para descoberta: a
+página HTML de cada vaga, com dados estruturados JobPosting. Então o caminho é
+sitemap → filtro pelo slug → página da vaga, e os dados chegam prontos e
+completos: título, empresa, local, data, descrição e modalidade.
+
+O pré-filtro pelo slug usa o **mesmo** `seniority.yml` que filtra títulos mais
+adiante — o slug é o título com hífens, e a normalização já troca pontuação por
+espaço. Sem isso, seriam 796 páginas por execução em vez de ~50.
+
+A limitação disso é conhecida e vale dizer: o slug só mostra o título. Vaga
+júnior anunciada como "Desenvolvedor Front-end", sem marca de nível no título,
+passa batido. Buscar as 796 páginas resolveria e levaria uns 26 minutos — mais
+que a execução inteira leva hoje.
 
 Três portais ficaram de fora, e o motivo importa:
 
@@ -117,7 +142,7 @@ Duas decisões de segurança, ambas com teste:
 ## Como uma vaga é selecionada
 
 ```
-coleta nos 5 portais
+coleta nos 6 portais
    ↓
 filtro de nível de entrada    → júnior / estágio / trainee / aprendiz
    ↓

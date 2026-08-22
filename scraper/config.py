@@ -43,7 +43,8 @@ class Settings:
     # A ProgramaThor ficou de fora: responde 403 a partir de IP de datacenter,
     # e este projeto roda no GitHub Actions.
     sources: list[str] = field(
-        default_factory=lambda: ["gupy", "vagas", "trampos", "linkedin", "wwr"]
+        default_factory=lambda: ["gupy", "vagas", "trampos", "linkedin", "wwr",
+                                 "geekhunter"]
     )
     output_dir: Path = DEFAULT_OUTPUT_DIR
 
