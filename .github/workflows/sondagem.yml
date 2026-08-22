@@ -1,0 +1,72 @@
+# Sondagem descartavel: mede como a GeekHunter responde de DENTRO do runner.
+#
+# Existe porque o proprio robots.txt do portal diz que o controle de acesso e
+# feito por "Cloudflare bot rules" -- e foi exatamente ai que a ProgramaThor e
+# o Glassdoor ficaram de fora: os dois respondem de IP residencial e 403 de IP
+# de datacenter. Medir de casa nao decide o que roda no GitHub Actions.
+#
+# So consulta o que o robots.txt libera: o sitemap e a pagina HTML de uma vaga.
+# /api/ e /feeds/ estao sob Disallow e nao sao tocados nem para sondar.
+#
+# Apague este arquivo depois de decidir sobre o portal.
+
+name: Sondagem da GeekHunter
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Consultar as superficies liberadas
+        run: |
+          python - <<'PY'
+          import json, re, time, urllib.error, urllib.request
+
+          UA_PROJETO = "vagas-remotas-alerta/1.0 (busca pessoal de vagas) python-requests"
+          UA_SEM_LIB = ("vagas-remotas-alerta/1.0 (busca pessoal de vagas; "
+                        "+https://github.com/EmidioLP/vagas-remotas-alerta)")
+
+          SITEMAP = "https://www.geekhunter.com.br/sitemap.xml"
+          VAGA = ("https://www.geekhunter.com.br/pt/ntt-data/jobs/"
+                  "engenheiro-a--de-redes-senior---sd-wan--netdevops---observabilidade-1")
+
+          def buscar(url, ua):
+              pedido = urllib.request.Request(url, headers={
+                  "User-Agent": ua, "Accept-Language": "pt-BR,pt;q=0.9"})
+              try:
+                  with urllib.request.urlopen(pedido, timeout=30) as r:
+                      return r.status, r.read().decode("utf-8", "replace")
+              except urllib.error.HTTPError as e:
+                  return e.code, ""
+              except Exception as e:
+                  return f"ERRO {type(e).__name__}", ""
+
+          for rotulo, ua in (("UA do projeto", UA_PROJETO),
+                             ("UA sem token de lib", UA_SEM_LIB)):
+              print(f"\n=== {rotulo} ===")
+
+              status, corpo = buscar(SITEMAP, ua)
+              vagas = len(re.findall(r"<loc>[^<]*/pt/[^<]*/jobs/[^<]*</loc>", corpo))
+              print(f"  sitemap    -> HTTP {status}  {len(corpo):>7} bytes  {vagas} vagas em /pt/")
+              time.sleep(3)
+
+              status, corpo = buscar(VAGA, ua)
+              blocos = re.findall(
+                  r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+                  corpo, re.S)
+              tem_jobposting = any(
+                  '"JobPosting"' in b for b in blocos)
+              print(f"  pagina     -> HTTP {status}  {len(corpo):>7} bytes  "
+                    f"JobPosting: {tem_jobposting}")
+              time.sleep(3)
+          PY
