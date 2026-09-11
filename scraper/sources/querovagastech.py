@@ -35,6 +35,7 @@ a morder, a coleta avisa em log em vez de silenciosamente trazer 10 vagas.
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 from ..config import Settings
 from ..datas import filtrar_recentes
@@ -52,7 +53,8 @@ from .base import JobSource
 
 logger = logging.getLogger(__name__)
 
-API_URL = "https://querovagastech.com.br/api/jobs"
+SITE_URL = "https://querovagastech.com.br"
+API_URL = f"{SITE_URL}/api/jobs"
 
 # A API limita a pagina a 100: pedir 200 devolve 100 do mesmo jeito.
 PAGE_SIZE = 100
@@ -162,6 +164,24 @@ class QueroVagasTechSource(JobSource):
         # algumas trazem HTML -- entao passa pelo mesmo limpador do modelo.
         job.description = strip_html(payload.get("description") or "")
 
+    @staticmethod
+    def _link(raw: dict, identificador: str) -> str:
+        """Link da vaga, com a pagina do portal como reserva.
+
+        Medido: 32 das 741 vagas nao trazem URL navegavel em `applyUrl` -- 31
+        vem como `manual://jobs/<uuid>` e uma traz um endereco de e-mail, que e
+        como aquela vaga recebe candidatura. Todas sao da curadoria manual,
+        justamente o que este portal acrescenta de melhor.
+
+        Sem reserva essas chegam no Discord sem link nenhum (o embed recusa
+        esquema que nao seja http), e vaga sem link nao da para aplicar. A
+        pagina do portal existe para toda vaga e mostra como se candidatar.
+        """
+        candidatura = (raw.get("applyUrl") or "").strip()
+        if urlsplit(candidatura).scheme in ("http", "https"):
+            return candidatura
+        return f"{SITE_URL}/vagas/{identificador}"
+
     def _parse(self, raw: dict) -> Job | None:
         identificador = raw.get("id")
         titulo = (raw.get("title") or "").strip()
@@ -173,7 +193,7 @@ class QueroVagasTechSource(JobSource):
             external_id=str(identificador),
             title=titulo,
             company=raw.get("company") or "",
-            url=raw.get("applyUrl") or "",
+            url=self._link(raw, str(identificador)),
             location=raw.get("location") or "",
             workplace_type=MODALIDADES.get(raw.get("workMode"), NAO_INFORMADO),
             published_date=(raw.get("postedAt") or "")[:10],

@@ -8,6 +8,7 @@ from scraper.config import Settings
 from scraper.models import HIBRIDO, NAO_INFORMADO, PRESENCIAL, REMOTO
 from scraper.sources.querovagastech import (
     MAX_PAGINAS,
+    SITE_URL,
     PAGE_SIZE,
     QueroVagasTechSource,
 )
@@ -120,6 +121,31 @@ def test_presencial_fora_do_rn_nao_passa():
     fonte = _fonte(_Sessao([]))
     job = fonte._parse({**ITEM, "workMode": "Onsite", "location": "Curitiba, PR, BR"})
     assert fonte._pre_filtrar([job]) == []
+
+
+@pytest.mark.parametrize("candidatura", [
+    "manual://jobs/8c879549-fdbb-46d0-be6f-5c85c11c8be8",  # 31 vagas assim
+    "rh@solus-it.com.br",   # candidatura por e-mail, medida no portal
+    "",
+    None,
+])
+def test_sem_url_navegavel_cai_na_pagina_do_portal(candidatura):
+    """O embed do Discord recusa esquema que não seja http: sem reserva, essas
+    vagas chegariam sem link e não daria para se candidatar."""
+    job = _fonte(_Sessao([]))._parse({**ITEM, "applyUrl": candidatura})
+    assert job.url == f"{SITE_URL}/vagas/{ITEM['id']}"
+
+
+def test_url_de_candidatura_boa_e_preservada():
+    job = _fonte(_Sessao([]))._parse(ITEM)
+    assert job.url == ITEM["applyUrl"]
+
+
+def test_link_de_reserva_e_aceito_pelo_discord():
+    """Fecha o ciclo: a reserva tem que passar na validação do notificador."""
+    from scraper.notificacao import url_valida
+    job = _fonte(_Sessao([]))._parse({**ITEM, "applyUrl": "manual://jobs/x"})
+    assert url_valida(job.url)
 
 
 def test_item_sem_titulo_ou_id_e_ignorado():
