@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte** — em seis portais a cada três dias e avisa no Discord **apenas as que
+Norte** — em sete portais a cada três dias e avisa no Discord **apenas as que
 ainda não foram mostradas**, para candidatar-se sem revisitar site nenhum.
 
 Roda sozinho no GitHub Actions. Não precisa de servidor.
@@ -89,6 +89,40 @@ python alerta.py
 | **Trampos.co** | API JSON pública que a SPA consome |
 | **We Work Remotely** | Feeds RSS por categoria (vagas globais) |
 | **GeekHunter** | Sitemap e páginas de vaga em HTML, com dados JobPosting |
+| **Quero Vagas Tech** | API JSON pública que o front consome, sem autenticação |
+
+## Quero Vagas Tech, e por que a senioridade dele é ignorada
+
+Este é um agregador: ele mesmo junta vagas de outros lugares. O `robots.txt`
+libera tudo (`Allow: /`, sem uma linha de `Disallow`) e a API que o front
+consome é pública, então a coleta é direta — listagem paginada e, para cada
+vaga, um endpoint com a descrição.
+
+**A senioridade que o portal declara não é aproveitada, e isso é deliberado.**
+Numa medição de 741 vagas, 292 vinham marcadas como `Intern` — entre elas
+"Gerente de Infraestrutura de TI - LATAM", "Auditor Pleno em Tecnologia" e
+"Analista de Produtos de TI Pleno". Isso pesa mais do que parece: o filtro de
+nível de entrada deste projeto **respeita** nível declarado pela fonte e nem
+consulta o título, justamente porque um campo do portal costuma ser mais
+confiável que adivinhação. Aceitar esse campo aqui faria passar gerente e
+pleno, então a fonte deixa o campo vazio e quem decide é o título.
+
+A listagem não traz descrição, e o portão de relevância depende dela. Buscar a
+descrição das 220 vagas de nível de entrada custaria 220 requisições por
+execução; filtrando antes pelo que a listagem já informa — título, data,
+modalidade e local — sobram 46. O pré-filtro chama as **mesmas funções** do
+pipeline, não cópias: é economia de requisição, nunca regra própria, e o
+pipeline reaplica tudo depois.
+
+Vale saber o que ele realmente acrescenta: 395 das 741 vagas vêm do mesmo
+portal da Gupy que este projeto já raspa direto, e a deduplicação por
+título+empresa colapsa essas. O ganho real é a curadoria manual do site, mais
+InfoJobs e Solides — das vagas que sobraram no funil, a grande maioria era da
+curadoria manual.
+
+O envelope da listagem traz `isLimited` e `requiresAuthForMore`. Hoje os dois
+vêm `false` para cliente anônimo, mas os campos existem: se um dia começarem a
+morder, a coleta avisa em log em vez de silenciosamente trazer dez vagas.
 
 A GeekHunter é coletada de um jeito diferente das outras cinco, e a diferença
 vem do `robots.txt` dela:
@@ -142,7 +176,7 @@ Duas decisões de segurança, ambas com teste:
 ## Como uma vaga é selecionada
 
 ```
-coleta nos 6 portais
+coleta nos 7 portais
    ↓
 filtro de nível de entrada    → júnior / estágio / trainee / aprendiz
    ↓
