@@ -124,3 +124,65 @@ def test_lista_vazia():
     unique, removed = deduplicate([])
     assert unique == []
     assert removed == 0
+
+
+# --- Marcas de 2 letras ------------------------------------------------------
+
+def test_marca_de_duas_letras_funde_entre_portais():
+    """Caso real: a regra `len > 2` apagava "MV" inteiro, e empresa sem
+    identidade nunca é cruzada — a vaga chegava duas vezes no Discord."""
+    jobs = [
+        Job(source="linkedin", external_id="4464917223",
+            title="DESENVOLVEDOR(A) JAVA FULLSTACK JÚNIOR", company="MV"),
+        Job(source="geekhunter", external_id="64f1019bcbb61f",
+            title="Desenvolvedor(a) Java Fullstack Júnior", company="MV Saúde Digital"),
+    ]
+    unique, removed = deduplicate(jobs)
+    assert len(unique) == 1
+    assert removed == 1
+
+
+def test_mesma_marca_curta_no_mesmo_portal_funde():
+    """O par a mais que a medição nas 741 vagas encontrou: correto."""
+    jobs = [
+        Job(source="q", external_id="1", title="Vaga: Supervisor De Projeto", company="Gi Group"),
+        Job(source="q", external_id="2", title="Vaga: Supervisor De Projeto", company="Gi Group"),
+    ]
+    assert len(deduplicate(jobs)[0]) == 1
+
+
+def test_marcas_curtas_diferentes_nao_fundem():
+    jobs = [
+        Job(source="gupy", external_id="1", title="Dev Júnior", company="MV"),
+        Job(source="linkedin", external_id="2", title="Dev Júnior", company="RD Station"),
+    ]
+    assert len(deduplicate(jobs)[0]) == 2
+
+
+def test_letra_solitaria_nao_identifica_empresa():
+    """"S.A." vira "s" e "a" — se contassem, toda S.A. seria a mesma empresa."""
+    jobs = [
+        Job(source="gupy", external_id="1", title="Dev Júnior", company="S.A."),
+        Job(source="linkedin", external_id="2", title="Dev Júnior", company="S/A"),
+    ]
+    assert len(deduplicate(jobs)[0]) == 2
+
+
+def test_sigla_generica_de_duas_letras_nao_funde_empresas():
+    """"TI" e "RH" aparecem em nome de muita empresa diferente."""
+    jobs = [
+        Job(source="gupy", external_id="1", title="Analista de Suporte Jr",
+            company="4INFRA Consultoria em TI"),
+        Job(source="linkedin", external_id="2", title="Analista de Suporte Jr",
+            company="Digitech Soluções em TI"),
+    ]
+    assert len(deduplicate(jobs)[0]) == 2
+
+
+def test_empresa_so_com_sigla_generica_fica_sem_identidade():
+    """Sem isto, "TI" sozinho seria subconjunto de qualquer "... em TI"."""
+    jobs = [
+        Job(source="gupy", external_id="1", title="Dev Júnior", company="TI"),
+        Job(source="linkedin", external_id="2", title="Dev Júnior", company="Acme TI"),
+    ]
+    assert len(deduplicate(jobs)[0]) == 2

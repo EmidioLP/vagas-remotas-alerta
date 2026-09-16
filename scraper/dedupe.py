@@ -29,14 +29,31 @@ _RUIDO_EMPRESA = {
     "solucoes", "servicos", "sistemas", "tecnologia", "tecnologias",
     "informatica", "consultoria", "consultores", "associados",
     "confidencial", "empresa", "multinacional", "vagas",
+    # Siglas genericas de 2 letras. Precisam estar aqui desde que palavras
+    # curtas passaram a identificar empresa (ver `_identidade_empresa`):
+    # "Consultoria em TI", "Attos RH", "Localiza&Co", "Software.com.br".
+    "ti", "it", "rh", "co", "on", "br", "ia", "ai",
+    "na", "no", "ao", "os", "as", "an", "of", "sp",
 }
 
 
 def _identidade_empresa(nome: str) -> frozenset[str]:
-    """Palavras que realmente identificam a empresa."""
+    """Palavras que realmente identificam a empresa.
+
+    Palavra de 2 letras conta. A regra ja foi `len > 2`, e apagava marcas
+    inteiras: "MV" ficava sem identidade, e empresa sem identidade nunca e
+    cruzada entre portais -- entao "MV" no LinkedIn e "MV Saude Digital" na
+    GeekHunter chegavam como duas vagas. Mesma coisa com RD Station, Gi Group,
+    BP, Q2. Letra solitaria continua fora: "S.A." vira "s" e "a", "D'Or" vira
+    "d" e "or".
+
+    Medido nas 741 vagas do Quero Vagas Tech antes da troca: a regra nova
+    junta um par a mais (duas "Supervisor De Projeto" da Gi Group), e nenhum
+    par errado.
+    """
     return frozenset(
         p for p in normalize(nome).split()
-        if p not in _RUIDO_EMPRESA and len(p) > 2
+        if p not in _RUIDO_EMPRESA and len(p) >= 2
     )
 
 
