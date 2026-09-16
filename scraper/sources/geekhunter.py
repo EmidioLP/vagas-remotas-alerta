@@ -29,7 +29,7 @@ import json
 import logging
 import re
 
-from ..models import NAO_INFORMADO, REMOTO, Job, normalize_workplace
+from ..models import NAO_INFORMADO, REMOTO, Job, normalize, normalize_workplace
 from ..seniority import default_filter
 from .base import JobSource
 
@@ -170,8 +170,14 @@ class GeekHunterSource(JobSource):
         if not locais:
             return ""
         endereco = (locais[0] or {}).get("address") or {}
-        partes = (endereco.get("addressLocality"), endereco.get("addressRegion"))
-        return ", ".join(p for p in partes if p)
+        cidade = (endereco.get("addressLocality") or "").strip()
+        uf = (endereco.get("addressRegion") or "").strip()
+        # O portal ja escreve a UF dentro da cidade ("Sao Paulo, SP" com regiao
+        # "SP"; "Mexico City, CDMX" com "CDMX"). Juntar as duas sempre dava
+        # "Fortaleza, CE, CE" no card. So acrescenta a UF quando ela falta.
+        if uf and normalize(uf) not in {normalize(p) for p in cidade.split(",")}:
+            return ", ".join(p for p in (cidade, uf) if p)
+        return cidade or uf
 
     @staticmethod
     def _modalidade(dados: dict, html: str) -> str:

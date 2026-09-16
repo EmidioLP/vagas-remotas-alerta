@@ -139,6 +139,22 @@ def test_identificador_cai_no_slug_quando_falta():
     assert job.external_id == "analista-de-redes-junior-1"
 
 
+@pytest.mark.parametrize("cidade,uf,esperado", [
+    # Formatos medidos: o portal já escreve a UF dentro da cidade.
+    ("Fortaleza, CE", "CE", "Fortaleza, CE"),
+    ("São Paulo, SP", "SP", "São Paulo, SP"),
+    ("Mexico City, CDMX", "CDMX", "Mexico City, CDMX"),
+    # Defensivo: se um dia vier sem, a UF é acrescentada.
+    ("Curitiba", "PR", "Curitiba, PR"),
+    ("", "SC", "SC"),
+    ("Recife, PE", "", "Recife, PE"),
+])
+def test_uf_nao_sai_duplicada(cidade, uf, esperado):
+    """Antes saía "Fortaleza, CE, CE" no card do Discord."""
+    dados = {"jobLocation": [{"address": {"addressLocality": cidade, "addressRegion": uf}}]}
+    assert GeekHunterSource._local(dados) == esperado
+
+
 def test_vaga_sem_local_nao_inventa_um():
     job = _source()._parse(_pagina(VAGA_REMOTA, chip="Remoto"), "https://x/jobs/y")
     assert job.location == ""
