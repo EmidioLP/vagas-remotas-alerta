@@ -206,9 +206,9 @@ idade que ele não afirma.
 ## Presencial no Rio Grande do Norte e em Fortaleza
 
 Além das remotas de qualquer lugar, entram as vagas do **RN inteiro** e da
-**cidade de Fortaleza (CE)** em qualquer modalidade — presencial, híbrida ou não
-informada. Aqui o **local** é a prova, e a modalidade não precisa ser afirmada:
-se dá para ir até lá, serve.
+**capital, Fortaleza (CE)**, sem a região metropolitana. Vale qualquer
+modalidade — presencial, híbrida ou não informada. Aqui o **local** é a prova,
+e a modalidade não precisa ser afirmada: se dá para ir até lá, serve.
 
 Isso exige **buscar** por localização, não só filtrar: numa coleta com as
 buscas nacionais, das 364 vagas encontradas exatamente **1** era do RN. Cada
@@ -218,16 +218,22 @@ API antes de virar código:
 | Portal | RN (estado) | Fortaleza (cidade) |
 |---|---|---|
 | **Gupy** | `state=Rio Grande do Norte` — por extenso; `RN` devolve zero | `city=Fortaleza` |
-| **LinkedIn** | `geoId=104863467` | `geoId=103836099` |
+| **LinkedIn** | `geoId=104863467` | `geoId=103836099` — cobre a região metropolitana; só vale o texto |
 | **Vagas.com** | `/vagas-em-natal-rn` | `/vagas-em-fortaleza-ce` — **com** a UF |
 | **Trampos** | fica de fora (ver abaixo) | fica de fora |
 | **We Work Remotely** | fica de fora — feed de vagas remotas globais | fica de fora |
 
-Estado e cidade não se pedem do mesmo jeito, e a diferença importa. Vaga que
-vem de uma consulta por local é aceita **pela consulta** — então pedir
+Estado e cidade não se pedem do mesmo jeito, e a diferença importa. No RN, vaga
+que vem de uma consulta por local é aceita **pela consulta** — então pedir
 `state=Ceará` e filtrar Fortaleza depois deixaria passar Caucaia e Juazeiro do
 Norte. No Vagas.com, `/vagas-em-fortaleza-ce` trouxe 11 de 11 em Fortaleza;
 sem o `-ce`, vieram São Paulo, Recife e "Brasil" misturados.
+
+Em Fortaleza a consulta **não** basta, porque o pedido é só a capital e o geoId
+do LinkedIn cobre a região metropolitana: numa coleta real, trouxe duas vagas
+de Maracanaú e uma de Eusébio. Por isso Fortaleza exige a cidade escrita no
+local da vaga. Na mesma coleta isso tirou exatamente essas três e manteve as
+26 da capital.
 
 A busca por local repete **os mesmos termos** da busca nacional, e isso não é
 detalhe. Consultar o estado inteiro sem termo foi tentado primeiro e trouxe
@@ -265,9 +271,10 @@ entram mesmo assim, porque os portais escrevem o estado junto.
 Em Fortaleza o nome sozinho não basta: existem **Fortaleza dos Valos** (RS),
 **Fortaleza de Minas** (MG), **Fortaleza dos Nogueiras** (MA) e **Cruzeiro da
 Fortaleza** (MG). Então só conta "Fortaleza" com o Ceará junto — que é como
-todos os portais medidos escrevem ("Fortaleza, Ceará", "Fortaleza / CE") — mais
-"Greater Fortaleza", do LinkedIn. Uma vaga que diga só "Fortaleza", sem estado,
-fica de fora: não dá para saber qual é.
+todos os portais medidos escrevem ("Fortaleza, Ceará", "Fortaleza / CE"). Uma
+vaga que diga só "Fortaleza", sem estado, fica de fora: não dá para saber qual
+é. "Greater Fortaleza", do LinkedIn, também fica: é o rótulo da região
+metropolitana inteira, e não prova que a vaga é na capital.
 
 O filtro de remotas descarta vagas sem modalidade informada: *"não informado"
 não é prova de remoto. Isso corta bastante — o LinkedIn e o Vagas.com não

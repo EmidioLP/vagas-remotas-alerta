@@ -74,11 +74,36 @@ def test_modalidade_nao_informada_no_rn_serve():
     assert serve_presencialmente(job, [RN])
 
 
-def test_vaga_vinda_de_consulta_por_local_vale_pela_consulta():
-    """Só é prova porque cada consulta por local foi medida precisa."""
-    job = _job(source="gupy", location="", local_consultado="fortaleza")
+def test_vaga_vinda_de_consulta_pelo_rn_vale_pela_consulta():
+    """No RN a consulta é prova: cada portal devolve só o estado."""
+    job = _job(source="linkedin", location="", local_consultado="rn")
+    assert serve_presencialmente(job, [RN])
+    assert not serve_presencialmente(job, [FORTALEZA]), "consulta de um local não vale para outro"
+
+
+@pytest.mark.parametrize("local", [
+    # Medido: vieram da consulta do LinkedIn por Fortaleza.
+    "Maracanaú, CE",
+    "Eusébio, CE",
+    # Rótulo da região metropolitana inteira.
+    "Greater Fortaleza",
+    "",
+])
+def test_em_fortaleza_a_consulta_nao_basta(local):
+    """O geoId do LinkedIn cobre a região metropolitana; o pedido é só a capital."""
+    job = _job(source="linkedin", location=local, local_consultado="fortaleza")
+    assert not serve_presencialmente(job, [FORTALEZA])
+
+
+def test_capital_vinda_da_consulta_continua_entrando():
+    job = _job(source="linkedin", location="Fortaleza, CE", local_consultado="fortaleza")
     assert serve_presencialmente(job, [FORTALEZA])
-    assert not serve_presencialmente(job, [RN]), "consulta de um local não vale para outro"
+
+
+def test_capital_entra_pelo_texto_mesmo_sem_consulta():
+    """Vale para fontes sem consulta por local, como a GeekHunter."""
+    job = _job(source="geekhunter", location="Fortaleza, CE")
+    assert serve_presencialmente(job, [FORTALEZA])
 
 
 # --- Fortaleza -------------------------------------------------------------
@@ -87,7 +112,7 @@ def test_vaga_vinda_de_consulta_por_local_vale_pela_consulta():
     # Formatos medidos, um de cada portal.
     "Fortaleza, Ceará",                                  # Gupy
     "Fortaleza, Ceará, Brazil",                          # LinkedIn
-    "Greater Fortaleza",                                 # LinkedIn
+    "Fortaleza, CE",                                     # LinkedIn
     "Fortaleza / CE A empresa aceita candidaturas de Fortaleza",  # Vagas.com
     "Fortaleza, Ceará, BR",                              # Quero Vagas Tech
     "Fortaleza - CE",
@@ -102,8 +127,10 @@ def test_reconhece_fortaleza(local):
     "Fortaleza de Minas, Minas Gerais",
     "Fortaleza dos Nogueiras, Maranhão",
     "Cruzeiro da Fortaleza, MG",
-    # Pedido foi a cidade, não o Ceará.
+    # Pedido foi a capital, não o Ceará nem a região metropolitana.
     "Caucaia, Ceará",
+    "Maracanaú, CE",
+    "Greater Fortaleza",
     "Juazeiro do Norte, CE",
     # Sem estado não dá para saber qual Fortaleza é.
     "Fortaleza",

@@ -8,7 +8,9 @@ API de verdade antes de virar codigo:
     zero) ou `city` para uma cidade -- `city=Fortaleza` trouxe 100 de 100 em
     Fortaleza, Ceara, enquanto `state=Ceara` traria Caucaia e Juazeiro junto.
   - **LinkedIn**: `geoId` numerico, obtido do typeahead do proprio portal.
-    O nome do local em portugues nao filtra nada (ver o coletor).
+    O nome do local em portugues nao filtra nada (ver o coletor). Atencao: o
+    geoId de uma cidade cobre a regiao metropolitana -- o de Fortaleza trouxe
+    vagas de Maracanau e Eusebio.
   - **Vagas.com**: caminho de URL por cidade, SEMPRE com a UF --
     `/vagas-em-fortaleza-ce` trouxe 11 de 11 em Fortaleza; sem o `-ce`, vieram
     Sao Paulo, Recife e "Brasil" misturados. Combinar termo e cidade
@@ -21,9 +23,14 @@ API de verdade antes de virar codigo:
   - **We Work Remotely**: fica de fora. O feed e de vagas remotas globais.
 
 Regra para qualquer local novo: so usar a consulta de um portal depois de
-provar que um local inventado devolve nada. Vaga vinda de consulta por local e
-aceita pela consulta (ver `serve_presencialmente`), entao um filtro frouxo no
-portal vira vaga de outro canto do pais no Discord.
+provar que um local inventado devolve nada. Vaga vinda de consulta por local
+pode ser aceita pela consulta (ver `serve_presencialmente`), entao um filtro
+frouxo no portal vira vaga de outro canto do pais no Discord.
+
+Quando a consulta e mais larga que o local -- uma cidade pedida, a regiao
+metropolitana devolvida --, o local desliga essa confianca
+(`consulta_e_prova=False`) e so vale o texto. E o caso de Fortaleza, onde o
+pedido foi so a capital.
 
 O reconhecimento no texto e deliberadamente estreito. No RN: sigla, nome do
 estado e as duas cidades que nao existem em outro estado -- "Parnamirim" tambem
@@ -31,7 +38,8 @@ e municipio de Pernambuco, e "Santa Cruz" existe em varios. Em Fortaleza o
 nome sozinho nao basta: ha Fortaleza dos Valos (RS), Fortaleza de Minas (MG),
 Fortaleza dos Nogueiras (MA) e Cruzeiro da Fortaleza (MG). Entao so conta
 "Fortaleza" com o Ceara junto, que e como todos os portais medidos escrevem
-("Fortaleza, Ceara", "Fortaleza / CE") -- mais "Greater Fortaleza", do LinkedIn.
+("Fortaleza, Ceara", "Fortaleza / CE"). "Greater Fortaleza", do LinkedIn, NAO
+conta: e o rotulo da regiao metropolitana, e nao prova que a vaga e na capital.
 """
 
 from __future__ import annotations
@@ -51,6 +59,9 @@ class Local:
     uf: str
     # Como o local aparece no texto que o portal devolve.
     reconhecer: tuple[str, ...]
+    # Vaga vinda de consulta por este local vale so por ter vindo dela? Falso
+    # quando algum portal devolve mais que o local -- ai o texto tem que provar.
+    consulta_e_prova: bool = True
     # Como pedir esse local a cada portal. Vazio = o portal nao entra.
     gupy_state: str = ""
     gupy_city: str = ""
@@ -80,8 +91,11 @@ FORTALEZA = Local(
     slug="fortaleza",
     nome="Fortaleza",
     uf="CE",
-    # "fortaleza" sozinho casaria Fortaleza dos Valos (RS) e afins.
-    reconhecer=("fortaleza ce", "fortaleza ceara", "greater fortaleza"),
+    # "fortaleza" sozinho casaria Fortaleza dos Valos (RS) e afins, e
+    # "Greater Fortaleza" e a regiao metropolitana inteira.
+    reconhecer=("fortaleza ce", "fortaleza ceara"),
+    # O geoId do LinkedIn devolve Maracanau e Eusebio; o pedido e so a capital.
+    consulta_e_prova=False,
     gupy_city="Fortaleza",
     linkedin_geo_id="103836099",
     vagas_cidades=("fortaleza-ce",),
@@ -109,6 +123,8 @@ def serve_presencialmente(job: Job, locais: list[Local]) -> bool:
     e a vaga passava por aqui sem estar no local.
     """
     for local in locais:
-        if job.local_consultado == local.slug or local.reconhece(job.location):
+        if local.reconhece(job.location):
+            return True
+        if local.consulta_e_prova and job.local_consultado == local.slug:
             return True
     return False
