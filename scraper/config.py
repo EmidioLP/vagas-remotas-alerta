@@ -69,7 +69,7 @@ class Settings:
     dias_max: int = 60
     # Locais onde vaga presencial ou hibrida tambem serve, alem das remotas
     # de qualquer lugar. Lista vazia = so remotas.
-    locais_presenciais: list[str] = field(default_factory=lambda: ["rn"])
+    locais_presenciais: list[str] = field(default_factory=lambda: ["rn", "fortaleza"])
 
     def ensure_output_dir(self) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)

@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dias", type=int, default=60,
                         help="Idade máxima da vaga em dias (0 desliga).")
     parser.add_argument("--locais", nargs="*", default=None, choices=sorted(LOCAIS),
-                        help="Onde vaga presencial também serve (padrão: rn). "
+                        help="Onde vaga presencial também serve (padrão: todos os locais). "
                              "Use --locais sem valor para aceitar só remotas.")
     parser.add_argument("--todas-modalidades", action="store_true",
                         help="Não filtrar por remoto (padrão é só remotas).")

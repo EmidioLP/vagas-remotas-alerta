@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 
-from ..locais import Local
 from ..models import HIBRIDO, PRESENCIAL, REMOTO, Job
 from .base import JobSource
 
@@ -48,22 +47,13 @@ class TramposSource(JobSource):
     def fetch_term(self, term: str) -> list[Job]:
         return self._paginar({"tr": term}, term=term)
 
-    def fetch_local(self, local: Local, terms: list[str]) -> list[Job]:
-        """Os mesmos termos, agora com `lc` restringindo a localizacao.
+    # Sem `fetch_local`, de proposito: o parametro `lc` da API nao filtra pelo
+    # local pedido. `lc=Natal`, `lc=Fortaleza` e `lc=CidadeQueNaoExisteXYZ`
+    # devolvem a mesma vaga. Como a listagem tambem nao traz cidade, nao ha
+    # como provar que uma vaga daqui e presencial em lugar nenhum -- entao o
+    # Trampos contribui so com vagas remotas. Ver `scraper/locais.py`.
 
-        A listagem nao traz a cidade, entao a vaga sai daqui marcada com o
-        local consultado -- e a unica prova que este portal da.
-        """
-        if not local.trampos_lc:
-            return []
-        jobs: list[Job] = []
-        for term in terms:
-            jobs.extend(self._paginar({"tr": term, "lc": local.trampos_lc},
-                                      term=term, local_slug=local.slug))
-        return jobs
-
-    def _paginar(self, filtro: dict, term: str = "",
-                 local_slug: str = "") -> list[Job]:
+    def _paginar(self, filtro: dict, term: str = "") -> list[Job]:
         jobs: list[Job] = []
         seen: set[str] = set()
 
@@ -77,7 +67,7 @@ class TramposSource(JobSource):
                 break
 
             for raw in batch:
-                job = self._parse(raw, term, local_slug)
+                job = self._parse(raw, term)
                 if job is None or job.external_id in seen:
                     continue
                 seen.add(job.external_id)
@@ -90,8 +80,7 @@ class TramposSource(JobSource):
 
         return jobs
 
-    def _parse(self, raw: dict, term: str,
-               local_slug: str = "") -> Job | None:
+    def _parse(self, raw: dict, term: str) -> Job | None:
         job_id = raw.get("id")
         title = (raw.get("name") or "").strip()
         if job_id is None or not title:
@@ -112,7 +101,6 @@ class TramposSource(JobSource):
             workplace_type=self._modalidade(raw),
             published_date=(raw.get("published_at") or "")[:10],
             search_term=term,
-            local_consultado=local_slug,
             seniority=TIPOS_DE_ENTRADA.get(raw.get("type_slug") or "", ""),
         )
 

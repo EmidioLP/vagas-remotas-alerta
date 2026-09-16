@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import pytest
 
+from scraper.config import Settings
 from scraper.locais import (
+    FORTALEZA,
     LOCAIS,
     RIO_GRANDE_DO_NORTE as RN,
     resolver,
     serve_presencialmente,
 )
 from scraper.models import NAO_INFORMADO, PRESENCIAL, REMOTO, Job
+from scraper.sources.base import JobSource
+from scraper.sources.gupy import GupySource
+from scraper.sources.trampos import TramposSource
 
 
 @pytest.mark.parametrize("local", [
@@ -69,10 +74,91 @@ def test_modalidade_nao_informada_no_rn_serve():
     assert serve_presencialmente(job, [RN])
 
 
-def test_vaga_do_trampos_sem_cidade_vale_pela_consulta():
-    """O portal não publica cidade: a prova é ter vindo da busca por RN."""
-    job = _job(source="trampos", location="", local_consultado="rn")
-    assert serve_presencialmente(job, [RN])
+def test_vaga_vinda_de_consulta_por_local_vale_pela_consulta():
+    """Só é prova porque cada consulta por local foi medida precisa."""
+    job = _job(source="gupy", location="", local_consultado="fortaleza")
+    assert serve_presencialmente(job, [FORTALEZA])
+    assert not serve_presencialmente(job, [RN]), "consulta de um local não vale para outro"
+
+
+# --- Fortaleza -------------------------------------------------------------
+
+@pytest.mark.parametrize("local", [
+    # Formatos medidos, um de cada portal.
+    "Fortaleza, Ceará",                                  # Gupy
+    "Fortaleza, Ceará, Brazil",                          # LinkedIn
+    "Greater Fortaleza",                                 # LinkedIn
+    "Fortaleza / CE A empresa aceita candidaturas de Fortaleza",  # Vagas.com
+    "Fortaleza, Ceará, BR",                              # Quero Vagas Tech
+    "Fortaleza - CE",
+])
+def test_reconhece_fortaleza(local):
+    assert FORTALEZA.reconhece(local)
+
+
+@pytest.mark.parametrize("local", [
+    # Homônimas medidas no typeahead do LinkedIn.
+    "Fortaleza dos Valos, Rio Grande do Sul",
+    "Fortaleza de Minas, Minas Gerais",
+    "Fortaleza dos Nogueiras, Maranhão",
+    "Cruzeiro da Fortaleza, MG",
+    # Pedido foi a cidade, não o Ceará.
+    "Caucaia, Ceará",
+    "Juazeiro do Norte, CE",
+    # Sem estado não dá para saber qual Fortaleza é.
+    "Fortaleza",
+])
+def test_nao_reconhece_fora_de_fortaleza(local):
+    assert not FORTALEZA.reconhece(local)
+
+
+def test_rn_e_fortaleza_nao_se_confundem():
+    assert not FORTALEZA.reconhece("Natal, RN")
+    assert not RN.reconhece("Fortaleza, Ceará")
+
+
+def test_fortaleza_esta_ativa_por_padrao():
+    assert "fortaleza" in Settings().locais_presenciais
+
+
+# --- Consultas por local nos portais --------------------------------------
+
+class _SessaoGravadora:
+    def __init__(self):
+        self.params = []
+        self.request_count = 0
+
+    def get_json(self, url, params=None, **kwargs):
+        self.params.append(params)
+        return None
+
+
+def test_gupy_consulta_fortaleza_pela_cidade_e_o_rn_pelo_estado():
+    """Pedir `state=Ceará` traria Caucaia e Juazeiro, aceitos pela consulta."""
+    sessao = _SessaoGravadora()
+    fonte = GupySource(session=sessao, settings=Settings())
+
+    fonte.fetch_local(FORTALEZA, ["desenvolvedor"])
+    assert sessao.params[-1]["city"] == "Fortaleza"
+    assert "state" not in sessao.params[-1]
+
+    fonte.fetch_local(RN, ["desenvolvedor"])
+    assert sessao.params[-1]["state"] == "Rio Grande do Norte"
+    assert "city" not in sessao.params[-1]
+
+
+def test_trampos_nao_consulta_por_local():
+    """Medido: `lc=Natal`, `lc=Fortaleza` e `lc=CidadeQueNaoExisteXYZ`
+    devolvem a mesma vaga. Consultar por local ali aceitaria vaga de fora."""
+    assert TramposSource.fetch_local is JobSource.fetch_local
+    fonte = TramposSource(session=_SessaoGravadora(), settings=Settings())
+    for local in LOCAIS.values():
+        assert fonte.fetch_local(local, ["desenvolvedor"]) == []
+
+
+def test_nenhum_local_tem_parametro_do_trampos():
+    for local in LOCAIS.values():
+        assert not hasattr(local, "trampos_lc")
 
 
 def test_sem_locais_configurados_nada_serve():

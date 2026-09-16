@@ -76,7 +76,7 @@ def coletar_vagas(settings: Settings) -> list[Job]:
                 if j.workplace_type == REMOTO or serve_presencialmente(j, locais)]
         if locais:
             logger.info("Remotas ou em %s: %d (-%d)",
-                        "/".join(l.uf for l in locais), len(jobs), antes - len(jobs))
+                        " / ".join(l.nome for l in locais), len(jobs), antes - len(jobs))
         else:
             logger.info("Remotas: %d (-%d)", len(jobs), antes - len(jobs))
 

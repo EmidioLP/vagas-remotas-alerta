@@ -1,8 +1,9 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte** — em sete portais a cada três dias e avisa no Discord **apenas as que
-ainda não foram mostradas**, para candidatar-se sem revisitar site nenhum.
+Norte e em Fortaleza** — em sete portais a cada três dias e avisa no Discord
+**apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
+site nenhum.
 
 Roda sozinho no GitHub Actions. Não precisa de servidor.
 
@@ -71,7 +72,7 @@ python alerta.py
 | `--sources gupy linkedin` | Escolhe os portais |
 | `--terms "..." "..."` | Substitui os termos de busca |
 | `--dias N` | Idade máxima da vaga, em dias (padrão 60; `0` desliga) |
-| `--locais rn` | Onde vaga presencial serve (padrão `rn`); sem valor = só remotas |
+| `--locais rn fortaleza` | Onde vaga presencial serve (padrão: todos); sem valor = só remotas |
 | `--todas-modalidades` | Não filtra por remoto |
 | `--max-pages N` | Páginas por termo, por portal (padrão 5) |
 | `--delay S` | Segundos entre requisições (padrão 2) |
@@ -186,7 +187,7 @@ portão de relevância tech     → descarta "Analista Contábil Jr" e afins
    ↓
 filtro de idade               → descarta o que passou de 60 dias
    ↓
-filtro de local               → remota de qualquer lugar, OU presencial no RN
+filtro de local               → remota de qualquer lugar, OU no RN / em Fortaleza
    ↓
 diff com o estado             → sobram as que você ainda não viu
 ```
@@ -202,40 +203,71 @@ relativo (`Há 5 dias`, `Hoje`), convertido na coleta. `Há mais de 30 dias` vir
 exatamente 30: é o piso que o portal garante, e arredondar para mais inventaria
 idade que ele não afirma.
 
-## Presencial no Rio Grande do Norte
+## Presencial no Rio Grande do Norte e em Fortaleza
 
-Além das remotas de qualquer lugar, entram as vagas do RN em qualquer
-modalidade — presencial, híbrida ou não informada. Aqui o **local** é a prova,
-e a modalidade não precisa ser afirmada: se dá para ir até lá, serve.
+Além das remotas de qualquer lugar, entram as vagas do **RN inteiro** e da
+**cidade de Fortaleza (CE)** em qualquer modalidade — presencial, híbrida ou não
+informada. Aqui o **local** é a prova, e a modalidade não precisa ser afirmada:
+se dá para ir até lá, serve.
 
 Isso exige **buscar** por localização, não só filtrar: numa coleta com as
 buscas nacionais, das 364 vagas encontradas exatamente **1** era do RN. Cada
 portal quer a localização num formato próprio, e todos foram medidos contra a
 API antes de virar código:
 
-| Portal | Como pedir o local |
-|---|---|
-| **Gupy** | `state=Rio Grande do Norte` — por extenso; `state=RN` devolve zero |
-| **LinkedIn** | `geoId=104863467`, obtido do typeahead do próprio portal |
-| **Vagas.com** | caminho por cidade: `/vagas-em-natal-rn` |
-| **Trampos** | `lc=Rio Grande do Norte`, texto livre |
-| **We Work Remotely** | fica de fora — é um feed de vagas remotas globais |
+| Portal | RN (estado) | Fortaleza (cidade) |
+|---|---|---|
+| **Gupy** | `state=Rio Grande do Norte` — por extenso; `RN` devolve zero | `city=Fortaleza` |
+| **LinkedIn** | `geoId=104863467` | `geoId=103836099` |
+| **Vagas.com** | `/vagas-em-natal-rn` | `/vagas-em-fortaleza-ce` — **com** a UF |
+| **Trampos** | fica de fora (ver abaixo) | fica de fora |
+| **We Work Remotely** | fica de fora — feed de vagas remotas globais | fica de fora |
+
+Estado e cidade não se pedem do mesmo jeito, e a diferença importa. Vaga que
+vem de uma consulta por local é aceita **pela consulta** — então pedir
+`state=Ceará` e filtrar Fortaleza depois deixaria passar Caucaia e Juazeiro do
+Norte. No Vagas.com, `/vagas-em-fortaleza-ce` trouxe 11 de 11 em Fortaleza;
+sem o `-ce`, vieram São Paulo, Recife e "Brasil" misturados.
 
 A busca por local repete **os mesmos termos** da busca nacional, e isso não é
 detalhe. Consultar o estado inteiro sem termo foi tentado primeiro e trouxe
 "Estagiário de Manutenção Industrial" — o portão de relevância o aceitou porque
 a descrição cita Excel e SAP. Com os termos, a consulta por local tem a mesma
-precisão da nacional: numa coleta real, 5 vagas do RN, todas de tecnologia.
+precisão da nacional.
 
-O reconhecimento do local no texto aceita `RN`, `Rio Grande do Norte`, `Natal`
-e `Mossoró`. Cidade homônima ficou de fora de propósito — `Parnamirim` também é
-município de Pernambuco, e `Santa Cruz` existe em vários estados. As outras
-cidades do RN entram mesmo assim, porque os portais escrevem o estado junto
-("Parnamirim, Rio Grande do Norte").
+### O Trampos saiu das consultas por local — era um erro
 
-O Trampos é o caso especial: a listagem dele não traz cidade nenhuma. Para essas
-vagas, a prova é terem vindo da consulta por RN — sem isso, tudo que o filtro
-por local trouxesse desse portal seria descartado na linha seguinte.
+O parâmetro `lc` da API do Trampos **muda** o resultado, mas não filtra pelo
+local pedido:
+
+```
+tr=desenvolvedor&lc=Natal                   -> vaga 772281
+tr=desenvolvedor&lc=Fortaleza               -> vaga 772281
+tr=desenvolvedor&lc=CidadeQueNaoExisteXYZ   -> vaga 772281
+```
+
+Quando o RN foi implementado, "7 vagas viram 2" foi lido como filtro
+funcionando. Como a listagem do Trampos não traz cidade, a vaga era aceita só
+por ter vindo da consulta — ou seja, vaga de qualquer lugar podia chegar como
+"do RN". O teste com um local inventado só foi feito ao adicionar Fortaleza.
+Agora o Trampos contribui apenas com vagas remotas.
+
+**Regra para qualquer local novo:** só usar a consulta de um portal depois de
+provar que um local inventado devolve nada.
+
+### Reconhecer o local no texto
+
+No RN o reconhecimento aceita `RN`, `Rio Grande do Norte`, `Natal` e `Mossoró`.
+Cidade homônima ficou de fora de propósito — `Parnamirim` também é município de
+Pernambuco, e `Santa Cruz` existe em vários estados. As outras cidades do RN
+entram mesmo assim, porque os portais escrevem o estado junto.
+
+Em Fortaleza o nome sozinho não basta: existem **Fortaleza dos Valos** (RS),
+**Fortaleza de Minas** (MG), **Fortaleza dos Nogueiras** (MA) e **Cruzeiro da
+Fortaleza** (MG). Então só conta "Fortaleza" com o Ceará junto — que é como
+todos os portais medidos escrevem ("Fortaleza, Ceará", "Fortaleza / CE") — mais
+"Greater Fortaleza", do LinkedIn. Uma vaga que diga só "Fortaleza", sem estado,
+fica de fora: não dá para saber qual é.
 
 O filtro de remotas descarta vagas sem modalidade informada: *"não informado"
 não é prova de remoto. Isso corta bastante — o LinkedIn e o Vagas.com não

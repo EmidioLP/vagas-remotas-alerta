@@ -37,13 +37,22 @@ class GupySource(JobSource):
         return self._paginar({"jobName": term}, term=term)
 
     def fetch_local(self, local: Local, terms: list[str]) -> list[Job]:
-        """Vagas do estado. `state=RN` devolve zero: a API quer o nome todo."""
-        if not local.gupy_state:
+        """Vagas do estado (`state`) ou da cidade (`city`).
+
+        `state=RN` devolve zero: a API quer o nome do estado por extenso. Para
+        uma cidade so, `city` -- pedir o estado e filtrar depois nao serve,
+        porque vaga vinda desta consulta e aceita pela consulta.
+        """
+        if local.gupy_city:
+            filtro = {"city": local.gupy_city}
+        elif local.gupy_state:
+            filtro = {"state": local.gupy_state}
+        else:
             return []
         jobs: list[Job] = []
         for term in terms:
             jobs.extend(self._paginar(
-                {"jobName": term, "state": local.gupy_state},
+                {"jobName": term, **filtro},
                 term=term, local_slug=local.slug))
         return jobs
 

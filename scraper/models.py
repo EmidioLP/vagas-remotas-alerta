@@ -87,8 +87,8 @@ class Job:
     published_date: str = ""
     search_term: str = ""
     # Slug do local consultado, quando a vaga veio de uma busca por local.
-    # O Trampos nao publica a cidade na listagem: sem isso, o que veio da
-    # consulta por RN seria descartado no filtro logo adiante.
+    # Conta como prova de local so porque cada consulta foi medida
+    # precisa -- ver `scraper/locais.py` antes de usar um portal novo.
     local_consultado: str = ""
     # Preenchidos pelo pipeline:
     area: str = ""
