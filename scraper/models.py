@@ -90,6 +90,9 @@ class Job:
     # Conta como prova de local so porque cada consulta foi medida
     # precisa -- ver `scraper/locais.py` antes de usar um portal novo.
     local_consultado: str = ""
+    # Falso quando os termos do portal proibem reproduzir a descricao. Ela
+    # continua servindo para classificar a vaga, mas nao vai para o Discord.
+    reproduzir_descricao: bool = True
     # Preenchidos pelo pipeline:
     area: str = ""
     area_score: float = 0.0

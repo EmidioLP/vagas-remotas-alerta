@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 BRASILEIRA = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+# O Mentora Dados publica so dia e mes ("16/09").
+DIA_MES = re.compile(r"^(\d{1,2})/(\d{1,2})$")
 RELATIVA = re.compile(
     r"ha\s+(?:mais\s+de\s+)?(\d+)\s+(dias?|semanas?|mes|meses|anos?)\b"
 )
@@ -57,6 +59,10 @@ def normalizar_data(bruto: str, hoje: date | None = None) -> str:
             return ""
 
     hoje = hoje or date.today()
+
+    if achado := DIA_MES.match(texto):
+        return _ano_provavel(int(achado.group(1)), int(achado.group(2)), hoje)
+
     simples = _sem_acento(texto)
     if "hoje" in simples:
         return hoje.isoformat()
@@ -71,6 +77,25 @@ def normalizar_data(bruto: str, hoje: date | None = None) -> str:
             days=quantidade * DIAS_POR_UNIDADE[achado.group(2)])).isoformat()
 
     return ""
+
+
+def _ano_provavel(dia: int, mes: int, hoje: date) -> str:
+    """Completa "dia/mes" com o ano mais recente que nao cai no futuro.
+
+    Vaga nao e publicada amanha, entao "20/12" lido em setembro e do ano
+    passado. Um dia de folga cobre fuso: o portal data no horario de Brasilia,
+    e o runner roda em UTC, que ja pode estar no dia seguinte.
+    """
+    try:
+        neste_ano = date(hoje.year, mes, dia)
+    except ValueError:
+        return ""
+    if neste_ano <= hoje + timedelta(days=1):
+        return neste_ano.isoformat()
+    try:
+        return date(hoje.year - 1, mes, dia).isoformat()
+    except ValueError:  # 29/02 de ano bissexto lido num ano comum
+        return ""
 
 
 def dias_desde(publicada: str, hoje: date | None = None) -> int | None:

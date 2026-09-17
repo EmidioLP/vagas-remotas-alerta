@@ -97,6 +97,31 @@ class PoliteSession:
                            response.headers.get("content-type"))
             return None
 
+    def post_json(self, url: str, **kwargs) -> dict | list | None:
+        """POST de LEITURA, com o mesmo delay e tratamento de erro do GET.
+
+        Existe para APIs que listam por POST, como o admin-ajax do WordPress.
+        O retry automatico da sessao so cobre GET (`allowed_methods`), entao
+        aqui e uma tentativa so. Nao use para acao que altera dado no portal.
+        """
+        self._wait_turn()
+        kwargs.setdefault("timeout", self.timeout_seconds)
+        self.request_count += 1
+        try:
+            response = self.session.post(url, **kwargs)
+        except requests.RequestException as exc:
+            logger.warning("Falha de rede em %s: %s", url, exc)
+            return None
+        if response.status_code >= 400:
+            logger.warning("HTTP %s em POST %s", response.status_code, url)
+            return None
+        try:
+            return response.json()
+        except ValueError:
+            logger.warning("Resposta nao-JSON em %s (content-type=%s)", url,
+                           response.headers.get("content-type"))
+            return None
+
     def close(self) -> None:
         self.session.close()
 

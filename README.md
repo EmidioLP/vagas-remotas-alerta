@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em sete portais a cada três dias e avisa no Discord
+Norte e em Fortaleza** — em oito portais a cada três dias e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -91,6 +91,49 @@ python alerta.py
 | **We Work Remotely** | Feeds RSS por categoria (vagas globais) |
 | **GeekHunter** | Sitemap e páginas de vaga em HTML, com dados JobPosting |
 | **Quero Vagas Tech** | API JSON pública que o front consome, sem autenticação |
+| **Mentora Dados** | `admin-ajax` do WordPress, liberado no `robots.txt` — só vagas de dados |
+
+## Mentora Dados: paywall respeitado e descrição fora do card
+
+Portal só de vagas de dados, em WordPress. A listagem chega pelo
+`admin-ajax.php`, que o `robots.txt` libera explicitamente, sem login nem nonce.
+O filtro de nível funciona no servidor: Júnior + Estágio são ~600 vagas em 12
+requisições, em vez de 3.300 em 66. O mesmo endpoint tem ações que **alteram**
+dados do site (votar numa vaga, registrar clique); a coleta só chama a de
+leitura.
+
+**O paywall é respeitado.** Parte das vagas é travada para assinante, e o
+servidor esconde de verdade: a vaga travada chega sem descrição e sem link. Ela
+é descartada — e por não entrar no estado de "já avisada", a vaga de acesso
+antecipado, que abre para todos à meia-noite, chega numa execução seguinte.
+
+**A descrição não vai para o Discord.** Os termos do site proíbem reproduzir o
+conteúdo produzido por eles, e as descrições vêm reescritas no formato do
+portal. Ela serve só para classificar a vaga; o card leva título, empresa,
+local, modelo, data, as skills que o próprio portal lista e o link. Isso é uma
+marca por vaga (`reproduzir_descricao`), então as outras fontes continuam com o
+card completo.
+
+Ao contrário do Quero Vagas Tech, **o nível declarado é aproveitado**: em 599
+vagas marcadas Júnior/Estágio, nenhuma tinha cargo de nível alto no título.
+
+O que foi medido e precisou de tratamento:
+
+- a data vem como `16/09`, sem ano — completada com o ano mais recente que não
+  cai no futuro;
+- o local é quase sempre só o estado ("Ceará (CE)"), então **esta fonte não
+  prova vaga em Fortaleza**: a capital exige a cidade escrita;
+- algumas vagas listam os 27 estados numa string só, que casaria com o
+  reconhecedor do RN — viram "Vários estados";
+- o link de candidatura às vezes é `#`, e às vezes é um e-mail com `http://`
+  colado na frente (`http://dados@empresa.com`), que o Discord recusa. Nos dois
+  casos o link vai para a página da vaga no portal, que mostra o e-mail.
+
+Numa coleta real: 599 vagas livres → **27 no funil** (26 remotas e 1 presencial
+no RN), e nenhuma delas chegava pelo LinkedIn com os termos atuais. Esse número
+merece desconfiança: 95% das vagas do portal vêm do LinkedIn, e ele acrescenta o
+nível ao fim de alguns títulos ("…Engenharia de Dados Estágio"), o que impede a
+deduplicação por título idêntico.
 
 ## Quero Vagas Tech, e por que a senioridade dele é ignorada
 
@@ -177,7 +220,7 @@ Duas decisões de segurança, ambas com teste:
 ## Como uma vaga é selecionada
 
 ```
-coleta nos 7 portais
+coleta nos 8 portais
    ↓
 filtro de nível de entrada    → júnior / estágio / trainee / aprendiz
    ↓

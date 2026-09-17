@@ -84,7 +84,11 @@ def attach_skills(jobs: list[Job], extractor: SkillExtractor | None = None) -> l
     """Preenche `job.skills`. Deve rodar ANTES da exportacao, que trunca a descricao."""
     extractor = extractor or default_extractor()
     for job in jobs:
-        job.skills = extractor.extract(job.title, job.description)
+        # Soma, nao sobrescreve: portal que publica a lista de skills da vaga
+        # (o Mentora Dados) tem a dele preservada e na frente. As demais fontes
+        # comecam com a lista vazia, entao para elas nada muda.
+        extraidas = extractor.extract(job.title, job.description)
+        job.skills = list(dict.fromkeys([*job.skills, *extraidas]))
     return jobs
 
 

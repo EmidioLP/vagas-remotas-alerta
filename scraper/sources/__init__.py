@@ -6,6 +6,7 @@ from .base import JobSource
 from .geekhunter import GeekHunterSource
 from .gupy import GupySource
 from .linkedin import LinkedInSource
+from .mentoradados import MentoraDadosSource
 from .querovagastech import QueroVagasTechSource
 from .trampos import TramposSource
 from .vagas_com import VagasComSource
@@ -19,11 +20,12 @@ SOURCE_REGISTRY: dict[str, type[JobSource]] = {
     WeWorkRemotelySource.name: WeWorkRemotelySource,
     GeekHunterSource.name: GeekHunterSource,
     QueroVagasTechSource.name: QueroVagasTechSource,
+    MentoraDadosSource.name: MentoraDadosSource,
 }
 
 AVAILABLE_SOURCES = list(SOURCE_REGISTRY)
 
 __all__ = ["JobSource", "GupySource", "VagasComSource",
            "TramposSource", "LinkedInSource", "WeWorkRemotelySource",
-           "GeekHunterSource", "QueroVagasTechSource",
+           "GeekHunterSource", "QueroVagasTechSource", "MentoraDadosSource",
            "SOURCE_REGISTRY", "AVAILABLE_SOURCES"]

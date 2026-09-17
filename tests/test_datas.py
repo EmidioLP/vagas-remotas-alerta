@@ -76,3 +76,19 @@ def test_limite_e_inclusivo_no_ultimo_dia():
 def test_zero_desliga_o_filtro():
     jobs = [_job("2022-03-11", "de 2022")]
     assert filtrar_recentes(jobs, 0, hoje=HOJE) == jobs
+
+
+@pytest.mark.parametrize("bruto,esperado", [
+    ("16/08", "2026-08-16"),
+    ("3/8", "2026-08-03"),
+    ("18/08", "2026-08-18"),   # amanha: folga de um dia por causa de fuso
+    ("20/12", "2025-12-20"),   # futuro distante: e do ano passado
+    ("01/01", "2026-01-01"),
+])
+def test_dia_e_mes_sem_ano(bruto, esperado):
+    """O Mentora Dados publica so dia e mes."""
+    assert normalizar_data(bruto, hoje=HOJE) == esperado
+
+
+def test_dia_e_mes_impossivel_vira_vazio():
+    assert normalizar_data("31/02", hoje=HOJE) == ""

@@ -44,7 +44,8 @@ class Settings:
     # e este projeto roda no GitHub Actions.
     sources: list[str] = field(
         default_factory=lambda: ["gupy", "vagas", "trampos", "linkedin", "wwr",
-                                 "geekhunter", "querovagastech"]
+                                 "geekhunter", "querovagastech",
+                                 "mentoradados"]
     )
     output_dir: Path = DEFAULT_OUTPUT_DIR
 

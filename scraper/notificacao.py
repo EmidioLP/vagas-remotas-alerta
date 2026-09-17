@@ -145,7 +145,12 @@ def url_valida(url: str) -> bool:
 
 
 def montar_embed(job: Job) -> dict:
-    """Um embed por vaga, com tudo que o portal informou sobre ela."""
+    """Um embed por vaga, com tudo que o portal informou sobre ela.
+
+    Exceto a descricao, quando a fonte marca `reproduzir_descricao=False`: ai
+    nem as secoes recortadas nem o inicio do texto entram no card.
+    """
+    reproduz = job.reproduzir_descricao
     campos = [
         _campo("Empresa", job.company, inline=True),
         _campo("Modalidade", job.workplace_type, inline=True),
@@ -155,10 +160,13 @@ def montar_embed(job: Job) -> dict:
         _campo("Publicada em", job.published_date, inline=True),
         # Todas as tecnologias, nao so as primeiras.
         _campo("Tecnologias", ", ".join(job.skills)),
-        _campo("Requisitos", extrair_secao(job.description, "Requisitos")),
-        _campo("Responsabilidades", extrair_secao(job.description, "Responsabilidades")),
-        _campo("Benefícios", extrair_secao(job.description, "Benefícios")),
     ]
+    if reproduz:
+        campos += [
+            _campo("Requisitos", extrair_secao(job.description, "Requisitos")),
+            _campo("Responsabilidades", extrair_secao(job.description, "Responsabilidades")),
+            _campo("Benefícios", extrair_secao(job.description, "Benefícios")),
+        ]
 
     embed: dict = {
         "title": job.title[:250],
@@ -179,7 +187,7 @@ def montar_embed(job: Job) -> dict:
     # para a mensagem nao ficar so com metadados.
     tem_secao = any(c and c["name"] in ("Requisitos", "Responsabilidades", "Benefícios")
                     for c in campos)
-    if not tem_secao and job.description:
+    if reproduz and not tem_secao and job.description:
         embed["description"] = job.description[:LIMITE_DESCRICAO]
 
     return embed

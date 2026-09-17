@@ -103,3 +103,21 @@ def test_overall_skill_counts():
 def test_skills_vao_para_o_csv_como_texto():
     job = Job(source="t", external_id="1", title="a", skills=["SQL", "Python"])
     assert job.to_row()["skills"] == "SQL, Python"
+
+
+def test_attach_skills_preserva_as_da_fonte_e_soma_as_extraidas():
+    """O Mentora Dados publica a lista de skills da vaga; ela nao pode sumir."""
+    from scraper.skills import attach_skills
+    job = Job(source="mentoradados", external_id="1", title="Engenheiro de Dados Junior",
+              description="Experiencia com Python.", skills=["dbt", "Airflow"])
+    attach_skills([job])
+    assert job.skills[:2] == ["dbt", "Airflow"]
+    assert "Python" in job.skills
+    assert len(job.skills) == len(set(job.skills))
+
+
+def test_attach_skills_sem_skills_da_fonte_continua_igual():
+    from scraper.skills import attach_skills
+    job = Job(source="gupy", external_id="1", title="Dev Junior", description="Python e SQL.")
+    attach_skills([job])
+    assert "Python" in job.skills
