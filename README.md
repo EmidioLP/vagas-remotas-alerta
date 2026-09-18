@@ -234,7 +234,8 @@ coleta nos 8 portais                                            3459
    ↓
 filtro de nível de entrada    júnior / estágio / trainee        2405
    ↓
-deduplicação                  id do portal, depois título +     1588
+deduplicação                  id do portal, id no link de       1588
+                              candidatura, depois título +
                               empresa, aceitando variações
                               do nome ("MV" e "MV Saúde Digital")
    ↓
@@ -247,6 +248,24 @@ filtro de local               remota de qualquer lugar, OU no    132
    ↓
 diff com o estado             sobram as que você ainda não viu    54
 ```
+
+A deduplicação tenta a prova mais forte primeiro. O **id que o link de
+candidatura carrega** é mais confiável que o título, porque agregador reescreve
+título e nome de empresa mas aponta para a mesma página do ATS. Foi assim que
+"DESENVOLVEDOR JÚNIOR" e "Desenvolvedor(a) Júnior – Engenharia / Projetos
+Técnicos" se revelaram a mesma vaga da BMP: mesmo UUID no link. Em 1.466 vagas
+reais de três fontes, essa regra pegou 8 duplicatas que as regras de título não
+pegavam.
+
+Id é reconhecido em quatro formas, todas medidas nos links das fontes: UUID
+(`inhire.app/vagas/53e6e9da-…`), sequência de 7 ou mais dígitos
+(`linkedin.com/jobs/view/4464615185`), segmento só de dígitos
+(`totvs.app/vempratotvs/11639`) e token com dígito
+(`gupy.io/job/eyJqb2JJZCI6…`). Slug de título **não** vale como id: seria igual
+em duas empresas do mesmo portal. E token precisa ter dígito — sem isso,
+`carreiratotvslinx` juntava três vagas diferentes da Linx e
+`CandidateExperience`, caminho fixo do Oracle Recruiting, juntava seis de
+empresas diferentes.
 
 O filtro de idade existe porque portal não tira anúncio velho do ar: numa
 coleta real vieram vagas de 2022, de painel de carreira já desativado. Vaga
