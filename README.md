@@ -24,9 +24,15 @@ soltos no texto. O bot os recorta pelos títulos de seção que os portais usam
 coleta real da Gupy: requisitos e responsabilidades em 12 de 12 vagas,
 benefícios em 6 de 12.
 
-Vagas do LinkedIn chegam só com os metadados: o card de busca daquele portal não
-traz descrição, então não há seções para extrair — e o card não finge ter o que
-não tem.
+Duas exceções, por motivos diferentes:
+
+- **LinkedIn**: o card de busca daquele portal não traz descrição, então não há
+  seções para extrair — e o card não finge ter o que não tem.
+- **Mentora Dados**: a descrição existe, mas os termos do portal proíbem
+  reproduzir o conteúdo produzido por ele. Ela é usada só para classificar a
+  vaga, e o card leva os dados mais as tecnologias que o próprio portal lista.
+
+Isso é uma marca por vaga (`reproduzir_descricao`), não uma regra global.
 
 ## Como configurar
 
@@ -44,8 +50,10 @@ A URL nunca entra em arquivo do repositório.
 
 **3. Pronto**
 
-O workflow roda sozinho a cada três dias, às 06:00 (Brasília). Para testar
-antes, dispare pela aba Actions marcando `dry_run` — ele mostra o que enviaria
+O workflow roda sozinho a cada três dias, às 06:00 (Brasília). Uma execução com
+os oito portais leva cerca de 13 minutos, dentro do limite de 30 do workflow —
+quase metade é do LinkedIn, que é o portal mais lento. Para testar antes,
+dispare pela aba Actions marcando `dry_run` — ele mostra o que enviaria
 sem enviar nada.
 
 ## Rodando na sua máquina
@@ -219,20 +227,25 @@ Duas decisões de segurança, ambas com teste:
 
 ## Como uma vaga é selecionada
 
+Os números ao lado são de uma execução real (17/09/2026), para dar escala:
+
 ```
-coleta nos 8 portais
+coleta nos 8 portais                                            3459
    ↓
-filtro de nível de entrada    → júnior / estágio / trainee / aprendiz
+filtro de nível de entrada    júnior / estágio / trainee        2405
    ↓
-deduplicação                  → por id do portal, depois por título+empresa
+deduplicação                  id do portal, depois título +     1588
+                              empresa, aceitando variações
+                              do nome ("MV" e "MV Saúde Digital")
    ↓
-portão de relevância tech     → descarta "Analista Contábil Jr" e afins
+portão de relevância tech     descarta "Analista Contábil Jr"    922
    ↓
-filtro de idade               → descarta o que passou de 60 dias
+filtro de idade               passou de 60 dias, sai             562
    ↓
-filtro de local               → remota de qualquer lugar, OU no RN / em Fortaleza
+filtro de local               remota de qualquer lugar, OU no    132
+                              RN, OU em Fortaleza
    ↓
-diff com o estado             → sobram as que você ainda não viu
+diff com o estado             sobram as que você ainda não viu    54
 ```
 
 O filtro de idade existe porque portal não tira anúncio velho do ar: numa
@@ -332,8 +345,8 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 150 testes e nenhum acessa a rede: os parsers são testados contra respostas
-reais capturadas dos portais.
+São 330 testes e nenhum acessa a rede: os parsers são testados contra respostas
+reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---
 
