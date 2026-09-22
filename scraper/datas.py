@@ -1,9 +1,10 @@
 """Data de publicacao no mesmo formato, venha como vier do portal.
 
-Quatro dos cinco portais ja entregam ISO (YYYY-MM-DD). O Vagas.com e a
-excecao: mistura "03/08/2026" com texto relativo ("Ha 5 dias", "Hoje"), que
-so faz sentido em relacao ao dia da coleta -- por isso `hoje` e parametro,
-e nao `date.today()` escondido dentro da funcao.
+A maioria dos portais ja entrega ISO (YYYY-MM-DD). As excecoes sao o
+Vagas.com, que mistura "03/08/2026" com texto relativo ("Ha 5 dias", "Hoje"),
+e o Recrutei, que so data em texto relativo e chega a datar em horas nas
+primeiras 24h. Texto relativo so faz sentido em relacao ao dia da coleta --
+por isso `hoje` e parametro, e nao `date.today()` escondido dentro da funcao.
 
 Data desconhecida vira "" e, no filtro, e tratada como "nao da para provar
 que e velha": a vaga fica. O oposto do filtro de remotas, onde a falta de
@@ -27,9 +28,14 @@ BRASILEIRA = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 # O Mentora Dados publica so dia e mes ("16/09").
 DIA_MES = re.compile(r"^(\d{1,2})/(\d{1,2})$")
 RELATIVA = re.compile(
-    r"ha\s+(?:mais\s+de\s+)?(\d+)\s+(dias?|semanas?|mes|meses|anos?)\b"
+    r"ha\s+(?:mais\s+de\s+)?(\d+)\s+"
+    r"(minutos?|horas?|dias?|semanas?|mes|meses|anos?)\b"
 )
 DIAS_POR_UNIDADE = {
+    # O Recrutei data em horas nas primeiras 24h ("Publicada ha 6 horas", em 4
+    # dos 134 cards de remotas). Idade menor que um dia e hoje.
+    "minuto": 0, "minutos": 0,
+    "hora": 0, "horas": 0,
     "dia": 1, "dias": 1,
     "semana": 7, "semanas": 7,
     "mes": 30, "meses": 30,

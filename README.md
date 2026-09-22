@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em dez portais todo dia e avisa no Discord
+Norte e em Fortaleza** — em onze portais todo dia e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -52,10 +52,11 @@ A URL nunca entra em arquivo do repositório.
 
 O workflow roda sozinho todo dia, às 06:00 (Brasília). Com os nove primeiros
 portais, uma execução media 17 minutos, dentro do limite de 30 do workflow —
-boa parte é do LinkedIn, que é o portal mais lento, e uns 4 são da Solides, que
-pagina de 10 em 10. O InfoJobs soma cerca de 2, em 57 requisições. Para testar
-antes, dispare pela aba Actions marcando `dry_run` — ele mostra o que enviaria
-sem enviar nada.
+boa parte é do LinkedIn, que é o portal mais lento. Com os onze, a medição
+local deu 20 minutos: LinkedIn 6m30, Solides 3m, Quero Vagas Tech 2m10,
+InfoJobs 2m e o Recrutei 50s, em 24 requisições. Para testar antes, dispare
+pela aba Actions marcando `dry_run` — ele mostra o que enviaria sem enviar
+nada.
 
 ## Rodando na sua máquina
 
@@ -103,6 +104,7 @@ python alerta.py
 | **Mentora Dados** | `admin-ajax` do WordPress, liberado no `robots.txt` — só vagas de dados |
 | **Solides** | API JSON pública que o front consome, com filtros nativos de área e nível |
 | **InfoJobs** | HTML da busca, renderizado no servidor; paginação por fragmento JSON |
+| **Recrutei** | HTML das listagens por caminho; descrição do JSON-LD da página da vaga |
 
 ## Mentora Dados: paywall respeitado e descrição fora do card
 
@@ -284,6 +286,101 @@ deduplicação removeu as mesmas 210 de quando o InfoJobs roda sozinho: nenhuma
 vaga foi colapsada entre os dois portais nessa execução, embora o agregador
 também liste InfoJobs.
 
+## Recrutei: o `robots.txt` fecha a busca, os caminhos resolvem
+
+O Recrutei Empregos reúne as vagas publicadas pelas consultorias de R&S que
+usam a plataforma Recrutei — acervo que não aparece nos outros dez portais. As
+listagens são renderizadas no servidor, como no Vagas.com e no InfoJobs.
+
+**Esta fonte não busca por termo, e quem decidiu isso foi o `robots.txt`.** A
+Solides e o Quero Vagas Tech também ignoram os termos, mas por falta de busca
+textual na API deles; aqui a busca existe — `GET /busca?keyword=…&city=…` — e o
+arquivo bloqueia exatamente essa forma:
+
+```
+Disallow: /api/  /recrutest/  /candidato/  /empresa/  /r/knowledge/
+Disallow: /*?*keyword=*
+Disallow: /*?*q=*
+```
+
+O que sobra — e basta — são as listagens por caminho, que não são bloqueadas,
+assim como `?page=`, `?model=`, `?setor=` e `?state=`. Por isso o coletor
+ignora os treze termos do projeto e varre três caminhos, em vez de fingir uma
+busca que o portal proíbe. Cada um foi medido antes de virar código
+(22/09/2026):
+
+| URL | O que faz de verdade |
+|---|---|
+| `/vagas-de-trabalho-remoto-home-office` | **134 vagas em 12 páginas de 12, todas com o selo "Remoto"** — é o `model=remote` do filtro lateral, em caminho limpo |
+| `/vagas/em/rn` | 12 vagas, todas de Natal; `?page=2` devolve zero card |
+| `/vagas/em/fortaleza-ce` | 43 vagas em 4 páginas, das quais **12 não são de Fortaleza** (7 de Eusébio, 5 de Maracanaú) |
+| `/vagas/em/cidade-inventada-xy` | **404** — a consulta por local filtra de verdade |
+| `?page=99` | 200 com zero card, sem repetir a primeira página |
+| `/vaga/<empresa>/<id>-<slug>` | `JobPosting` em JSON-LD: descrição, `datePosted` com hora, `skills` e `jobLocation` |
+
+Varrer as categorias em vez da listagem de remotas seria desperdício: só
+`/vagas/tecnologia` tem 44 páginas, e a taxonomia do portal é barulhenta —
+"Atendente - área da saúde" aparece em tecnologia. A listagem de home office
+entrega exatamente o que o funil quer, em 12 requisições.
+
+**Os termos de uso, ao contrário dos do InfoJobs, não proíbem nada disso.** São
+três páginas e dez cláusulas dirigidas ao candidato — cadastro, bloqueio,
+e-mails, foro —, sem uma linha sobre crawler, acesso automatizado ou reprodução
+de conteúdo; a cláusula 7 apenas reserva as marcas e a propriedade intelectual
+da Recrutei. E a descrição sai do JSON-LD, marcação que o portal publica
+justamente para ser sindicada. Por isso aqui a descrição **vai** para o Discord,
+no padrão do projeto.
+
+**A descrição é o motivo de esta fonte abrir uma página por vaga.** O card
+mostra título, empresa, local, salário, data e selos — e nenhuma descrição.
+Isso derruba o portão de relevância: "ENGENHEIRO DE IA JR" é reprovado por
+`is_tech` com o título sozinho e aprovado com a descrição, que casa "python",
+"postgresql", "backend" e "apis" e a classifica como Backend. Sem abrir a
+página, a fonte perderia justamente as vagas que o funil procura. A saída é a
+mesma da GeekHunter e do Quero Vagas Tech: pré-filtrar pelo que a listagem já
+informa — nível, data, modalidade e local — e só então abrir a página das que
+sobraram. Das 189 listadas, sobraram 6.
+
+**A consulta por local filtra, mas mesmo assim não prova o local.** Lugar
+inventado responde 404, que é a prova que o projeto exige antes de confiar numa
+consulta — diferente do `lc` do Trampos, que não filtra, e do InfoJobs, que
+desvia para São Paulo. O que impede confiar nela é outra coisa: a cidade traz a
+região metropolitana. Dos 43 cards de `fortaleza-ce`, 12 eram de Eusébio e
+Maracanaú. Então `local_consultado` fica vazio, e quem prova o local é o texto
+do card, que sempre traz "Cidade, UF, Brasil".
+
+Três coisas a mais, as três medidas:
+
+- **"Presencial ou Remoto" não é remoto.** O portal distingue quatro
+  modalidades no próprio filtro (`model=remote`, `presential`,
+  `presential-remote`, `hybrid`) e deixa a terceira de fora da listagem de home
+  office. O de-para do projeto leria o selo como remoto, só por achar "remoto"
+  na string — por isso o coletor traz um de-para explícito, e a vaga entra como
+  híbrida;
+- **a data vem em texto relativo** ("Publicada há 1 mês", "há 6 dias") e, nas
+  primeiras 24 horas, **em horas** — 4 dos 134 cards de remotas. Isso ensinou
+  horas e minutos ao normalizador de datas, que já entendia dias, semanas e
+  meses. Para as vagas cuja página é aberta, o `datePosted` do JSON-LD
+  sobrescreve a estimativa do card com a data exata;
+- **o link do card vem com query de rastreio** (`?has_bot=1`,
+  `?utm_source=recrutei-empregos-premium`), descartada na hora do parsing: o id
+  da vaga está no caminho, e a página responde 200 sem ela.
+
+O portal não declara nível nenhum no card, então a senioridade não vem da fonte
+e quem decide é o regex — a mesma postura do InfoJobs e do Quero Vagas Tech.
+
+Uma execução completa da fonte: **189 vagas listadas → 6 candidatas no
+pré-filtro → 6 páginas abertas → 1 de tecnologia → 1 no aviso**, em 24
+requisições e 50 segundos. A queda de 189 para 6 é o pré-filtro fazendo o que o
+pipeline faria depois: o acervo do Recrutei é generalista, e vaga júnior de
+tecnologia é a minoria dele.
+
+Rodando com os outros dez portais no mesmo dia, a coleta inteira foi de **4.494
+vagas brutas a 163 no aviso**, em 20 minutos. Quanto do acervo do Recrutei os
+outros portais já cobrem não foi medido vaga a vaga; o que se sabe do recorte é
+que são vagas de consultorias de R&S, e não de páginas de carreira nem dos
+agregadores tech que o projeto já lê.
+
 ## Quero Vagas Tech, e por que a senioridade dele é ignorada
 
 Este é um agregador: ele mesmo junta vagas de outros lugares. O `robots.txt`
@@ -442,6 +539,7 @@ API antes de virar código:
 | **We Work Remotely** | fica de fora — feed de vagas remotas globais | fica de fora |
 | **Solides** | `locations=RN` — a sigla; o nome por extenso devolve zero | `locations=CE` — só sabe pedir a UF; só vale o texto |
 | **InfoJobs** | `/…-em-natal,-rn` e `/…-em-mossoro,-rn` — **com** a UF e a vírgula | `/…-em-fortaleza,-ce` — só vale o texto |
+| **Recrutei** | `/vagas/em/rn` — a UF sozinha cobre Natal e Mossoró | `/vagas/em/fortaleza-ce` — traz Eusébio e Maracanaú; só vale o texto |
 
 Estado e cidade não se pedem do mesmo jeito, e a diferença importa. No RN, vaga
 que vem de uma consulta por local é aceita **pela consulta** — então pedir
@@ -509,7 +607,7 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 423 testes e nenhum acessa a rede: os parsers são testados contra respostas
+São 468 testes e nenhum acessa a rede: os parsers são testados contra respostas
 reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---

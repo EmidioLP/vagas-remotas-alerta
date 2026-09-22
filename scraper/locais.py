@@ -33,6 +33,11 @@ API de verdade antes de virar codigo:
     frouxa: nos 13 termos, `natal,-rn` trouxe 88 cards dos quais 83 nao eram
     de Natal. Por isso o coletor confere o desvio e, mesmo assim, nao passa
     `local_consultado` -- quem prova o local ali e o texto do card.
+  - **Recrutei**: caminho `/vagas/em/<lugar>`, que aceita tanto a UF (`rn`,
+    12 vagas, todas de Natal) quanto a cidade com a UF junto (`fortaleza-ce`,
+    43 vagas). Filtra de verdade -- lugar inventado responde 404 --, mas a
+    cidade traz a regiao metropolitana: dos 43 cards de Fortaleza, 12 eram de
+    Eusebio e Maracanau. Dai `local_consultado` tambem ficar vazio ali.
 
 Regra para qualquer local novo: so usar a consulta de um portal depois de
 provar que um local inventado devolve nada. Vaga vinda de consulta por local
@@ -85,6 +90,10 @@ class Local:
     # O InfoJobs so honra a cidade com a UF junto e com a virgula:
     # `/empregos-em-natal.aspx` devolve Sao Paulo, `natal,-rn` devolve Natal.
     infojobs_cidades: tuple[str, ...] = ()
+    # Caminho de `/vagas/em/...` no Recrutei: a UF sozinha no RN, que cobre
+    # Natal e Mossoro de uma vez, e a cidade com a UF em Fortaleza. Lugar
+    # inventado responde 404.
+    recrutei_caminhos: tuple[str, ...] = ()
 
     def reconhece(self, texto: str) -> bool:
         """O texto de localizacao do portal aponta para este local?"""
@@ -105,6 +114,9 @@ RIO_GRANDE_DO_NORTE = Local(
     vagas_cidades=("natal-rn", "mossoro-rn"),
     solides_uf="RN",
     infojobs_cidades=("natal,-rn", "mossoro,-rn"),
+    # A UF sozinha ja traz as duas cidades; `/vagas/em/natal-rn` seria um
+    # subconjunto dela.
+    recrutei_caminhos=("rn",),
 )
 
 FORTALEZA = Local(
@@ -123,6 +135,9 @@ FORTALEZA = Local(
     # `consulta_e_prova=False` acima vale tambem para esta consulta.
     solides_uf="CE",
     infojobs_cidades=("fortaleza,-ce",),
+    # 43 cards, dos quais 12 sao de Eusebio e Maracanau -- de novo a regiao
+    # metropolitana, de novo so o texto vale.
+    recrutei_caminhos=("fortaleza-ce",),
 )
 
 LOCAIS: dict[str, Local] = {

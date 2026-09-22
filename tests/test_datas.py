@@ -20,6 +20,9 @@ HOJE = date(2026, 8, 17)
     ("03/08/2026", "2026-08-03"),
     ("9/7/2026", "2026-07-09"),
     ("Há 5 dias", "2026-08-12"),
+    # O Recrutei data em horas nas primeiras 24h; menos de um dia é hoje.
+    ("Publicada há 6 horas", "2026-08-17"),
+    ("há 45 minutos", "2026-08-17"),
     ("há 1 dia", "2026-08-16"),
     ("Hoje", "2026-08-17"),
     ("Ontem", "2026-08-16"),

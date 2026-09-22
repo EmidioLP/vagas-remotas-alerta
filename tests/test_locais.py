@@ -15,6 +15,7 @@ from scraper.locais import (
 from scraper.models import NAO_INFORMADO, PRESENCIAL, REMOTO, Job
 from scraper.sources.base import JobSource
 from scraper.sources.gupy import GupySource
+from scraper.sources.recrutei import LISTAGEM_REMOTA, RecruteiSource
 from scraper.sources.trampos import TramposSource
 
 
@@ -153,10 +154,17 @@ def test_fortaleza_esta_ativa_por_padrao():
 class _SessaoGravadora:
     def __init__(self):
         self.params = []
+        self.urls = []
         self.request_count = 0
 
     def get_json(self, url, params=None, **kwargs):
         self.params.append(params)
+        return None
+
+    def get(self, url, **kwargs):
+        """O Recrutei pede o local no caminho, nao em parametro."""
+        self.urls.append(url)
+        self.request_count += 1
         return None
 
 
@@ -172,6 +180,21 @@ def test_gupy_consulta_fortaleza_pela_cidade_e_o_rn_pelo_estado():
     fonte.fetch_local(RN, ["desenvolvedor"])
     assert sessao.params[-1]["state"] == "Rio Grande do Norte"
     assert "city" not in sessao.params[-1]
+
+
+def test_recrutei_consulta_o_rn_pela_uf_e_fortaleza_pela_cidade():
+    """Lugar inventado da 404 ali, mas a cidade traz a regiao metropolitana:
+    dos 43 cards de `fortaleza-ce`, 12 eram de Eusebio e Maracanau. Por isso a
+    consulta nao vira `local_consultado` (ver o coletor)."""
+    sessao = _SessaoGravadora()
+    fonte = RecruteiSource(session=sessao, settings=Settings())
+
+    fonte.fetch([])
+    assert sessao.urls == [
+        LISTAGEM_REMOTA,
+        "https://empregos.recrutei.com.br/vagas/em/rn",
+        "https://empregos.recrutei.com.br/vagas/em/fortaleza-ce",
+    ]
 
 
 def test_trampos_nao_consulta_por_local():

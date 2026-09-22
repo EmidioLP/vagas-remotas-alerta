@@ -45,7 +45,8 @@ class Settings:
     sources: list[str] = field(
         default_factory=lambda: ["gupy", "vagas", "trampos", "linkedin", "wwr",
                                  "geekhunter", "querovagastech",
-                                 "mentoradados", "solides", "infojobs"]
+                                 "mentoradados", "solides", "infojobs",
+                                 "recrutei"]
     )
     output_dir: Path = DEFAULT_OUTPUT_DIR
 
