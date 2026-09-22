@@ -18,6 +18,11 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
+# Instrucoes locais para o Claude Code -- ferramenta de quem edita, nao
+# parte do projeto.
+CLAUDE.md
+.claude/
+
 # Segredos -- o webhook do Discord NUNCA entra no repositorio
 .env
 .env.*
