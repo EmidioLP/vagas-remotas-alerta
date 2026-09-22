@@ -117,6 +117,20 @@ def test_presencial_no_rn_passa_o_pre_filtro():
     assert fonte._pre_filtrar([job]) == [job]
 
 
+def test_sem_modalidade_com_remoto_no_titulo_passa_o_pre_filtro():
+    fonte = _fonte(_Sessao([]))
+    job = fonte._parse({**ITEM, "workMode": "Unknown",
+                        "title": "Desenvolvedor Júnior (Remoto)"})
+    assert fonte._pre_filtrar([job]) == [job]
+    assert job.workplace_type == REMOTO
+
+
+def test_sem_modalidade_e_sem_pista_nao_passa_o_pre_filtro():
+    fonte = _fonte(_Sessao([]))
+    job = fonte._parse({**ITEM, "workMode": "Unknown"})
+    assert fonte._pre_filtrar([job]) == []
+
+
 def test_presencial_fora_do_rn_nao_passa():
     fonte = _fonte(_Sessao([]))
     job = fonte._parse({**ITEM, "workMode": "Onsite", "location": "Curitiba, PR, BR"})

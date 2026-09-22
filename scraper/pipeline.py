@@ -12,10 +12,11 @@ import logging
 from .classifier import classify_jobs, default_classifier, filter_tech
 from .config import Settings
 from .datas import filtrar_recentes
-from .locais import resolver, serve_presencialmente
+from .locais import resolver, serve
 from .dedupe import deduplicate
 from .http_client import PoliteSession
-from .models import REMOTO, Job
+from .modalidade import completar_modalidade, sem_modalidade
+from .models import Job
 from .seniority import filter_entry_level
 from .skills import attach_skills
 from .sources import SOURCE_REGISTRY
@@ -68,12 +69,16 @@ def coletar_vagas(settings: Settings) -> list[Job]:
         logger.info("Publicadas nos ultimos %d dias: %d (-%d)",
                     settings.dias_max, len(jobs), antes - len(jobs))
 
+    sem_rotulo = sum(sem_modalidade(j.workplace_type) for j in jobs)
+    completar_modalidade(jobs)
+    inferidas = sem_rotulo - sum(sem_modalidade(j.workplace_type) for j in jobs)
+    logger.info("Modalidade inferida do texto: %d de %d sem modalidade",
+                inferidas, sem_rotulo)
+
     if settings.somente_remotas:
         antes = len(jobs)
         locais = resolver(settings.locais_presenciais)
-        # Remota de qualquer lugar, ou presencial/hibrida onde da para ir.
-        jobs = [j for j in jobs
-                if j.workplace_type == REMOTO or serve_presencialmente(j, locais)]
+        jobs = [j for j in jobs if serve(j, locais)]
         if locais:
             logger.info("Remotas ou em %s: %d (-%d)",
                         " / ".join(l.nome for l in locais), len(jobs), antes - len(jobs))

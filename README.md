@@ -26,8 +26,9 @@ benefícios em 6 de 12.
 
 Duas exceções, por motivos diferentes:
 
-- **LinkedIn**: o card de busca daquele portal não traz descrição, então não há
-  seções para extrair — e o card não finge ter o que não tem.
+- **LinkedIn**: a descrição vem da página de detalhe de cada vaga, mas os termos
+  do LinkedIn proíbem copiar o conteúdo. Ela serve para ler a modalidade e
+  classificar a vaga, e não vai para o Discord.
 - **Mentora Dados**: a descrição existe, mas os termos do portal proíbem
   reproduzir o conteúdo produzido por ele. Ela é usada só para classificar a
   vaga, e o card leva os dados mais as tecnologias que o próprio portal lista.
@@ -51,10 +52,11 @@ A URL nunca entra em arquivo do repositório.
 **3. Pronto**
 
 O workflow roda sozinho todo dia, às 06:00 (Brasília). Com os nove primeiros
-portais, uma execução media 17 minutos, dentro do limite de 30 do workflow —
-boa parte é do LinkedIn, que é o portal mais lento. Com os onze, a medição
-local deu 20 minutos: LinkedIn 6m30, Solides 3m, Quero Vagas Tech 2m10,
-InfoJobs 2m e o Recrutei 50s, em 24 requisições. Para testar antes, dispare
+portais, uma execução media 17 minutos — boa parte é do LinkedIn, que é o
+portal mais lento. Com os onze, a medição local deu 20 minutos: LinkedIn 6m30,
+Solides 3m, Quero Vagas Tech 2m10, InfoJobs 2m e o Recrutei 50s, em 24
+requisições. A página de detalhe do LinkedIn soma uns 7 minutos (100 pedidos a
+~4,5 s cada), e por isso o limite do workflow subiu de 30 para 40 minutos. Para testar antes, dispare
 pela aba Actions marcando `dry_run` — ele mostra o que enviaria sem enviar
 nada.
 
@@ -96,7 +98,7 @@ python alerta.py
 |---|---|
 | **Gupy** | Endpoint JSON público que o front do portal usa |
 | **Vagas.com.br** | HTML da busca, renderizado no servidor |
-| **LinkedIn Jobs** | API de convidado, sem login (`geoId` do Brasil) |
+| **LinkedIn Jobs** | API de convidado, sem login (`geoId` do Brasil); detalhe de até 100 vagas por coleta |
 | **Trampos.co** | API JSON pública que a SPA consome |
 | **We Work Remotely** | Feeds RSS por categoria (vagas globais) |
 | **GeekHunter** | Sitemap e páginas de vaga em HTML, com dados JobPosting |
@@ -598,6 +600,40 @@ O filtro de remotas descarta vagas sem modalidade informada: *"não informado"
 não é prova de remoto. Isso corta bastante — o LinkedIn e o Vagas.com não
 distinguem presencial de híbrido no card de listagem.
 
+### Modalidade lida no texto
+
+Quando o portal não informa a modalidade, `scraper/modalidade.py` tenta lê-la
+no texto da vaga, com as regras de `scraper/rules/modalidade.yml` — as mesmas do
+projeto irmão vagas-tech-junior. Ela só completa, nunca corrige: o valor que o
+portal afirma não é tocado.
+
+- **Título e local decidem primeiro**, e ali uma palavra solta vale: "Junior
+  Software Engineer (Remote)", "Analista de Dados Jr | Remota".
+- **Na descrição, só frases** ("100% remoto", "modalidade 100% remota",
+  "modelo híbrido"). Palavra solta cai em armadilha: "suporte **remoto**" é
+  atividade, "auxílio **home office**" é benefício de vaga híbrida, "nuvem
+  **híbrida**" é tecnologia, e "software para o futuro do **trabalho remoto**" é o
+  produto da empresa.
+- **Duas modalidades conflitantes não viram chute**: "remoto ou híbrido" continua
+  "não informado", e a vaga continua descartada.
+
+Medido em 22/09/2026, apagando o rótulo das vagas que o portal informa e
+inferindo de novo: **37 de 38 palpites "Remoto" certos** (153 de 171 no total).
+Aqui o erro pesa mais que no projeto irmão, onde um palpite errado é uma barra
+num gráfico: aqui é uma vaga presencial de outro estado no Discord.
+
+No mesmo dia, o ganho foi quase todo do LinkedIn. Só pelo título, 3 remotas
+resgatadas, todas certas. Com a página de detalhe de 300 vagas, mais 4 — duas
+certas ("modalidade 100% remota", "100% home office"), uma errada (o produto da
+empresa, que virou exceção no YAML) e uma duvidosa ("trabalho remoto" numa lista
+de benefícios). Esses 300 pedidos custaram uns 22 minutos, e por isso o teto
+ficou em 100 (`linkedin_max_detalhes`), gastos primeiro nas vagas em que a
+descrição decide o filtro.
+
+O `robots.txt` do LinkedIn proíbe `/jobs-guest/`, tanto a busca quanto o
+detalhe. É a única exceção à regra de que o `robots.txt` decide o caminho da
+coleta, por decisão do mantenedor — a mesma do projeto irmão.
+
 As regras de classificação ficam em três YAMLs comentados
 (`scraper/rules/`), editáveis sem tocar em Python.
 
@@ -607,7 +643,7 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 468 testes e nenhum acessa a rede: os parsers são testados contra respostas
+São 515 testes e nenhum acessa a rede: os parsers são testados contra respostas
 reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---

@@ -300,8 +300,132 @@ def test_linkedin_pagina_vazia():
 
 
 def test_linkedin_sem_descricao_no_card():
-    """A busca não traz descrição; a classificação se apoia no título."""
+    """A busca não traz descrição; `fetch` a completa pela página de detalhe."""
     assert _source(LinkedInSource)._parse_page(LINKEDIN_HTML, "x")[0].description == ""
+
+
+def test_linkedin_descricao_nao_vai_para_o_discord():
+    """Os termos do LinkedIn proíbem copiar o conteúdo."""
+    assert _source(LinkedInSource)._parse_page(LINKEDIN_HTML, "x")[0].reproduzir_descricao is False
+
+
+# Recorte real de
+# GET https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4460757790
+LINKEDIN_DETALHE_HTML = """
+<section class="show-more-less-html" data-max-lines="5">
+  <div class="show-more-less-html__markup show-more-less-html__markup--clamp-after-5 relative overflow-hidden">
+          Na <strong>Agenda Assessoria</strong>, acreditamos que pessoas talentosas são protagonistas na construção de soluções que fortalecem a gestão previdenciária.<br/><br/>Estamos em busca de um(a) <strong>Desenvolvedor Júnior </strong>para integrar nosso time.<br/><br/><strong>Principais responsabilidades<br/><br/></strong><ul><li>Apoiar o desenvolvimento, manutenção e correção de funcionalidades do PreviContas, sob acompanhamento técnico.</li></ul>
+  </div>
+</section>
+<ul class="description__job-criteria-list">
+  <li class="description__job-criteria-item">
+    <h3 class="description__job-criteria-subheader">Nível de experiência</h3>
+    <span class="description__job-criteria-text description__job-criteria-text--criteria">Não aplicável</span>
+  </li>
+</ul>
+"""
+
+
+class _Resposta:
+    def __init__(self, text):
+        self.text = text
+
+
+class _SessaoLinkedIn:
+    """Responde a busca com `cards` e o detalhe com `detalhes[id]` (None = falha)."""
+
+    def __init__(self, cards, detalhes):
+        self.cards, self.detalhes = cards, detalhes
+        self.pedidos_detalhe: list[str] = []
+        self.request_count = 0
+
+    def get(self, url, **kwargs):
+        self.request_count += 1
+        if "jobPosting/" in url:
+            external_id = url.rsplit("/", 1)[1]
+            self.pedidos_detalhe.append(external_id)
+            html = self.detalhes.get(external_id)
+            return None if html is None else _Resposta(html)
+        # Uma unica pagina de busca, igual para todos os termos.
+        return _Resposta(self.cards) if kwargs["params"]["start"] == 0 else None
+
+
+def _card(external_id, titulo, publicada=""):
+    momento = f'<time datetime="{publicada}"></time>' if publicada else ""
+    return f"""
+<div class="base-card" data-entity-urn="urn:li:jobPosting:{external_id}">
+  <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/{external_id}"></a>
+  <h3 class="base-search-card__title">{titulo}</h3>
+  <h4 class="base-search-card__subtitle">ACME</h4>
+  <span class="job-search-card__location">Recife, PE</span>
+  {momento}
+</div>"""
+
+
+def _linkedin(cards, detalhes, **ajustes):
+    sessao = _SessaoLinkedIn("".join(cards), detalhes)
+    # Sem locais: a consulta por local repetiria os mesmos cards.
+    settings = Settings(locais_presenciais=[], **ajustes)
+    return LinkedInSource(session=sessao, settings=settings), sessao
+
+
+def test_linkedin_parse_da_descricao_do_detalhe():
+    texto = LinkedInSource._parse_descricao(LINKEDIN_DETALHE_HTML)
+    assert texto.startswith("Na Agenda Assessoria , acreditamos")
+    assert "Apoiar o desenvolvimento" in texto
+    assert "Nível de experiência" not in texto  # os criterios ficam de fora
+    assert LinkedInSource._parse_descricao("<html></html>") is None
+
+
+def test_linkedin_detalhe_preenche_a_descricao_de_todas_as_copias():
+    src, sessao = _linkedin([_card("1", "Desenvolvedor Júnior")],
+                            {"1": LINKEDIN_DETALHE_HTML})
+    jobs = src.fetch(["dev junior", "desenvolvedor junior"])
+    assert len(jobs) == 2  # mesma vaga em dois termos
+    assert sessao.pedidos_detalhe == ["1"]  # um detalhe por id
+    assert all("Agenda Assessoria" in j.description for j in jobs)
+
+
+def test_linkedin_so_pede_detalhe_de_vaga_de_entrada():
+    src, sessao = _linkedin(
+        [_card("1", "Desenvolvedor Júnior"), _card("2", "Desenvolvedor Sênior")],
+        {"1": LINKEDIN_DETALHE_HTML, "2": LINKEDIN_DETALHE_HTML},
+    )
+    jobs = {j.external_id: j for j in src.fetch(["dev"])}
+    assert sessao.pedidos_detalhe == ["1"]
+    assert jobs["2"].description == ""
+
+
+def test_linkedin_nao_pede_detalhe_de_vaga_velha():
+    src, sessao = _linkedin(
+        [_card("1", "Estágio em TI", "2022-01-10"), _card("2", "Estágio em TI")],
+        {"1": LINKEDIN_DETALHE_HTML, "2": LINKEDIN_DETALHE_HTML},
+    )
+    src.fetch(["estagio"])
+    # A sem data fica: o silencio esconde so a idade.
+    assert sessao.pedidos_detalhe == ["2"]
+
+
+def test_linkedin_respeita_o_teto_de_detalhes():
+    cards = [_card(str(i), "Estágio em TI") for i in range(5)]
+    src, sessao = _linkedin(cards, {str(i): LINKEDIN_DETALHE_HTML for i in range(5)},
+                            linkedin_max_detalhes=2)
+    src.fetch(["estagio"])
+    assert sessao.pedidos_detalhe == ["0", "1"]
+
+    src, sessao = _linkedin(cards, {}, linkedin_max_detalhes=0)
+    src.fetch(["estagio"])
+    assert sessao.pedidos_detalhe == []
+
+
+def test_linkedin_para_depois_de_falhas_seguidas():
+    cards = [_card(str(i), "Estágio em TI") for i in range(6)]
+    # So o primeiro detalhe responde; depois o portal "bloqueia".
+    src, sessao = _linkedin(cards, {"0": LINKEDIN_DETALHE_HTML})
+    jobs = src.fetch(["estagio"])
+    assert sessao.pedidos_detalhe == ["0", "1", "2", "3"]  # 1 ok + 3 falhas seguidas
+    assert len(jobs) == 6  # as vagas listadas continuam, sem descricao
+    assert [j.description != "" for j in jobs] == [True] + [False] * 5
 
 
 # Recorte real de
@@ -396,3 +520,15 @@ def test_wwr_categorias_sao_de_tecnologia():
     assert all(c.startswith("remote-") for c in CATEGORIAS)
 
 
+
+
+def test_linkedin_detalhe_prioriza_onde_decide_o_filtro():
+    cards = [
+        _card("1", "Estagiário Administrativo"),               # titulo sem tech
+        _card("2", "Desenvolvedor Júnior (Remoto)"),           # ja passa
+        _card("3", "Desenvolvedor Júnior"),                    # descricao decide
+    ]
+    src, sessao = _linkedin(cards, {}, linkedin_max_detalhes=3)
+    src.fetch(["dev"])
+    assert sessao.pedidos_detalhe[0] == "3"
+    assert sessao.pedidos_detalhe[-1] == "1"

@@ -64,7 +64,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .models import Job, normalize
+from .models import REMOTO, Job, normalize
 
 
 @dataclass(frozen=True)
@@ -167,3 +167,12 @@ def serve_presencialmente(job: Job, locais: list[Local]) -> bool:
         if local.consulta_e_prova and job.local_consultado == local.slug:
             return True
     return False
+
+
+def serve(job: Job, locais: list[Local]) -> bool:
+    """Remota de qualquer lugar, ou presencial/hibrida onde da para ir.
+
+    E o filtro de remotas do pipeline; os pre-filtros das fontes chamam esta
+    mesma funcao para nao divergir dele.
+    """
+    return job.workplace_type == REMOTO or serve_presencialmente(job, locais)

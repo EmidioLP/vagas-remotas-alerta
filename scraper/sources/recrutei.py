@@ -86,7 +86,8 @@ import re
 from bs4 import BeautifulSoup
 
 from ..datas import filtrar_recentes, normalizar_data
-from ..locais import resolver, serve_presencialmente
+from ..locais import resolver, serve
+from ..modalidade import completar_modalidade
 from ..models import (
     HIBRIDO,
     NAO_INFORMADO,
@@ -283,9 +284,9 @@ class RecruteiSource(JobSource):
 
         if self.settings.somente_remotas:
             locais = resolver(self.settings.locais_presenciais)
-            jobs = [j for j in jobs
-                    if j.workplace_type == REMOTO
-                    or serve_presencialmente(j, locais)]
+            # So titulo e local nesta altura; a descricao ainda nao veio.
+            completar_modalidade(jobs)
+            jobs = [j for j in jobs if serve(j, locais)]
 
         return jobs
 
