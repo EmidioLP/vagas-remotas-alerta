@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em nove portais todo dia e avisa no Discord
+Norte e em Fortaleza** — em dez portais todo dia e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -50,11 +50,12 @@ A URL nunca entra em arquivo do repositório.
 
 **3. Pronto**
 
-O workflow roda sozinho todo dia, às 06:00 (Brasília). Uma execução com
-os nove portais leva cerca de 17 minutos, dentro do limite de 30 do workflow —
+O workflow roda sozinho todo dia, às 06:00 (Brasília). Com os nove primeiros
+portais, uma execução media 17 minutos, dentro do limite de 30 do workflow —
 boa parte é do LinkedIn, que é o portal mais lento, e uns 4 são da Solides, que
-pagina de 10 em 10. Para testar antes, dispare pela aba Actions marcando
-`dry_run` — ele mostra o que enviaria sem enviar nada.
+pagina de 10 em 10. O InfoJobs soma cerca de 2, em 57 requisições. Para testar
+antes, dispare pela aba Actions marcando `dry_run` — ele mostra o que enviaria
+sem enviar nada.
 
 ## Rodando na sua máquina
 
@@ -101,6 +102,7 @@ python alerta.py
 | **Quero Vagas Tech** | API JSON pública que o front consome, sem autenticação |
 | **Mentora Dados** | `admin-ajax` do WordPress, liberado no `robots.txt` — só vagas de dados |
 | **Solides** | API JSON pública que o front consome, com filtros nativos de área e nível |
+| **InfoJobs** | HTML da busca, renderizado no servidor; paginação por fragmento JSON |
 
 ## Mentora Dados: paywall respeitado e descrição fora do card
 
@@ -198,6 +200,90 @@ regra do projeto: `locations=LocalQueNaoExisteXYZ` devolve nada. Como só sabe
 pedir o estado, para Fortaleza vem o Ceará inteiro — o que já está tratado, já
 que a capital não aceita a consulta como prova e exige a cidade escrita.
 
+## InfoJobs: o `robots.txt` libera, os termos não
+
+O InfoJobs é um dos maiores portais de vagas do país, e a busca dele é
+renderizada no servidor — os cards já vêm no HTML, como no Vagas.com. O
+`robots.txt` não proíbe nenhum caminho de busca nem as páginas de vaga; o que
+ele bloqueia é `/App_WebServices`, `/*.ashx$`, `/candidate`, `/company`,
+`/detailvacancy.aspx` e `/Concursos`, e nada disso é usado aqui. Não há
+`Crawl-delay` nem `Sitemap:` declarado (`/sitemap.xml` responde 404), então a
+descoberta é por busca paginada, e não por sitemap como na GeekHunter.
+
+A coleta foi medida de IP residencial; **do runner do GitHub Actions ainda
+não**. Foi assim que a ProgramaThor caiu fora do projeto — 403 a partir de IP
+de datacenter —, então vale conferir a primeira execução no workflow.
+
+**Os termos de uso, porém, proíbem mais do que o `robots.txt`.** Em
+`/legal/aviso-legal-para-candidatos__15727.aspx` está escrito que "cópias
+mediante tecnologias de buscador tipo 'Robot/Crawler' (...) estão expressamente
+proibidas" e que "é proibido a reprodução, distribuição, transmissão, adaptação
+ou modificação (...) do conteúdo do Portal". É mais forte do que qualquer outra
+fonte deste projeto: o Mentora Dados proíbe só reproduzir a descrição. A
+escolha aqui foi coletar apenas o que o card já mostra, e nunca republicar o
+texto — `reproduzir_descricao=False`, como no Mentora Dados. A descrição ainda
+classifica a vaga; o aviso leva título, empresa, local, modalidade, data e
+link. **Nenhuma requisição por vaga é feita**: a página de detalhe não é
+aberta, o que mantém a coleta inteira em 57 requisições.
+
+Cada parâmetro foi medido antes de virar código (22/09/2026):
+
+| URL | O que faz de verdade |
+|---|---|
+| `/vagas-de-emprego-<termo>.aspx` | Listagem geral: "python" devolve 233 vagas |
+| `/vagas-de-emprego-<termo>-trabalho-home-office.aspx` | **Só remotas**: as mesmas 233 viram 70. É a única listagem de modalidade que o site marca `rel="follow"` |
+| `/vagas-de-emprego-<termo>-em-<cidade>,-<uf>.aspx` | Por cidade, **com a vírgula literal**: `/empregos-em-natal,-rn.aspx` devolve 2.130 vagas; `fortaleza,-ce`, 3.061 |
+| `/empregos-em-natal.aspx` (sem a UF) | **200 e redireciona para São Paulo**, igual a `cidadequenaoexistexyz,-rn` |
+| `?page=2` na página HTML | Ignorado — devolve a mesma primeira vaga; testadas onze variantes |
+| `/mf-publicarea/VacancyList/GetVacancyListFragment?url=…&page=N` | A paginação real: JSON com `eof` e `listFragmentHTML`, com a mesma marcação de card |
+
+A busca nacional usa só a listagem de home office, que é o que o funil quer e
+custa menos: nos treze termos do projeto deu 74 cards na primeira página, e
+apenas "estagio desenvolvimento" encheu a página de 20.
+
+**A consulta por cidade não prova o local.** O portal completa a página com
+vaga de qualquer canto quando a cidade tem pouco resultado: nos treze termos, `natal,-rn` devolveu 88 cards dos quais
+83 não eram de Natal — "Todo Brasil" apareceu 110 vezes e "São Paulo - SP" 28
+no total das três cidades. Pior, o portal **conta** essas vagas como resultado
+("1 Vaga de Emprego de devops junior em Natal - RN" no cabeçalho) e não as
+marca de nenhum jeito: `data-typesimilar` vem vazio tanto nelas quanto nos
+acertos. Quem prova o local aqui é o texto do card, que sempre traz cidade e UF
+("Natal - RN", "Fortaleza - CE"). Confiar na consulta repetiria o erro do
+Trampos, e por isso esta fonte não passa `local_consultado`.
+
+O redirecionamento silencioso é a outra metade do mesmo problema, e é tratado
+no código: antes de ler a página, o coletor compara a URL pedida com a que
+voltou, e descarta a consulta inteira quando o portal desviou. É isso que
+transforma local inválido em zero vaga — a prova que o projeto exige antes de
+usar consulta por local em qualquer portal.
+
+Três coisas a mais, as três medidas:
+
+- **a modalidade vem escrita no card**, ao lado do salário e da escolaridade, e
+  o InfoJobs distingue as três: em 269 cards, 191 "Home office", 62 "Presencial"
+  e 16 "Híbrido". Diferente do Vagas.com, aqui a híbrida é afirmada em vez de
+  virar "não informado";
+- **o nome da empresa nem sempre é um link** — há link para a página dela
+  (`/empresa-grupo-easy__-57056.aspx`), link para a página própria (`/printi`) e
+  o texto solto "Empresa confidencial", sem `<a>` nenhum. Ler só o link deixava
+  a vaga confidencial sem empresa;
+- **a data útil está escondida**. O texto visível é "17 set", sem ano, mas o
+  card carrega `data-value="2026/09/17 11:14:00"` num campo oculto. Sem ele
+  sobra "Hoje"/"Ontem"; sem os dois a data fica vazia, e a vaga permanece no
+  filtro de idade.
+
+Não existe nível "Júnior" no filtro do portal (só Estagiário, Trainee, Analista
+e afins), então a senioridade não é declarada pela fonte e quem decide é o
+regex — a mesma postura do Quero Vagas Tech.
+
+Uma execução completa da fonte: **405 vagas brutas → 271 de nível de entrada →
+61 depois da deduplicação → 9 de tecnologia → 8 no aviso**, em 57 requisições e
+cerca de 2 minutos. A queda de 271 para 61 é a mesma vaga aparecendo em vários
+termos e nas três cidades. Rodando InfoJobs e Quero Vagas Tech juntos, a
+deduplicação removeu as mesmas 210 de quando o InfoJobs roda sozinho: nenhuma
+vaga foi colapsada entre os dois portais nessa execução, embora o agregador
+também liste InfoJobs.
+
 ## Quero Vagas Tech, e por que a senioridade dele é ignorada
 
 Este é um agregador: ele mesmo junta vagas de outros lugares. O `robots.txt`
@@ -223,15 +309,16 @@ pipeline reaplica tudo depois.
 
 Vale saber o que ele realmente acrescenta: 395 das 741 vagas vêm do mesmo
 portal da Gupy que este projeto já raspa direto, e a deduplicação por
-título+empresa colapsa essas. O ganho real é a curadoria manual do site, mais
-InfoJobs e Solides — das vagas que sobraram no funil, a grande maioria era da
-curadoria manual.
+título+empresa colapsa essas. O ganho real é a curadoria manual do site — das
+vagas que sobraram no funil, a grande maioria era dela. O InfoJobs e a Solides,
+que também alimentam o acervo dele, hoje são coletados direto e não dependem
+mais deste caminho.
 
 O envelope da listagem traz `isLimited` e `requiresAuthForMore`. Hoje os dois
 vêm `false` para cliente anônimo, mas os campos existem: se um dia começarem a
 morder, a coleta avisa em log em vez de silenciosamente trazer dez vagas.
 
-A GeekHunter é coletada de um jeito diferente das outras cinco, e a diferença
+A GeekHunter é coletada de um jeito diferente das demais, e a diferença
 vem do `robots.txt` dela:
 
 ```
@@ -283,7 +370,7 @@ Duas decisões de segurança, ambas com teste:
 ## Como uma vaga é selecionada
 
 Os números ao lado são de uma execução real (17/09/2026), para dar escala.
-Ela é anterior à Solides, então o funil mostra oito portais:
+Ela é anterior à Solides e ao InfoJobs, então o funil mostra oito portais:
 
 ```
 coleta nos 8 portais                                            3459
@@ -354,6 +441,7 @@ API antes de virar código:
 | **Trampos** | fica de fora (ver abaixo) | fica de fora |
 | **We Work Remotely** | fica de fora — feed de vagas remotas globais | fica de fora |
 | **Solides** | `locations=RN` — a sigla; o nome por extenso devolve zero | `locations=CE` — só sabe pedir a UF; só vale o texto |
+| **InfoJobs** | `/…-em-natal,-rn` e `/…-em-mossoro,-rn` — **com** a UF e a vírgula | `/…-em-fortaleza,-ce` — só vale o texto |
 
 Estado e cidade não se pedem do mesmo jeito, e a diferença importa. No RN, vaga
 que vem de uma consulta por local é aceita **pela consulta** — então pedir
@@ -421,7 +509,7 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 383 testes e nenhum acessa a rede: os parsers são testados contra respostas
+São 423 testes e nenhum acessa a rede: os parsers são testados contra respostas
 reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---

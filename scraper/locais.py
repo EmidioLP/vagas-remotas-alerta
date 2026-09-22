@@ -25,6 +25,14 @@ API de verdade antes de virar codigo:
     enquanto `Natal` e `Rio Grande do Norte` devolvem zero. Filtra de verdade
     (`locations=LocalQueNaoExisteXYZ` devolve zero), mas so sabe pedir o
     estado: para uma cidade, vem a UF inteira.
+  - **InfoJobs**: caminho de URL por cidade, SEMPRE com a UF e com a virgula
+    literal -- `/empregos-em-natal,-rn.aspx` devolve 2.130 vagas de Natal,
+    enquanto `/empregos-em-natal.aspx` responde 200 e **redireciona para Sao
+    Paulo**, igual a `/empregos-em-cidadequenaoexistexyz,-rn.aspx`. Cidade que
+    ele nao reconhece nao da erro, da outro estado. E a consulta ainda e
+    frouxa: nos 13 termos, `natal,-rn` trouxe 88 cards dos quais 83 nao eram
+    de Natal. Por isso o coletor confere o desvio e, mesmo assim, nao passa
+    `local_consultado` -- quem prova o local ali e o texto do card.
 
 Regra para qualquer local novo: so usar a consulta de um portal depois de
 provar que um local inventado devolve nada. Vaga vinda de consulta por local
@@ -74,6 +82,9 @@ class Local:
     # A Solides quer a SIGLA da UF ("RN"); nome de cidade ou de estado por
     # extenso devolve zero. Como e por UF, uma cidade traz o estado inteiro.
     solides_uf: str = ""
+    # O InfoJobs so honra a cidade com a UF junto e com a virgula:
+    # `/empregos-em-natal.aspx` devolve Sao Paulo, `natal,-rn` devolve Natal.
+    infojobs_cidades: tuple[str, ...] = ()
 
     def reconhece(self, texto: str) -> bool:
         """O texto de localizacao do portal aponta para este local?"""
@@ -93,6 +104,7 @@ RIO_GRANDE_DO_NORTE = Local(
     linkedin_geo_id="104863467",
     vagas_cidades=("natal-rn", "mossoro-rn"),
     solides_uf="RN",
+    infojobs_cidades=("natal,-rn", "mossoro,-rn"),
 )
 
 FORTALEZA = Local(
@@ -110,6 +122,7 @@ FORTALEZA = Local(
     # A UF traz o Ceara inteiro, mais largo que a capital -- e por isso que
     # `consulta_e_prova=False` acima vale tambem para esta consulta.
     solides_uf="CE",
+    infojobs_cidades=("fortaleza,-ce",),
 )
 
 LOCAIS: dict[str, Local] = {
