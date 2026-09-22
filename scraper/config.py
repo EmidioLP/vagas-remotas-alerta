@@ -46,7 +46,7 @@ class Settings:
         default_factory=lambda: ["gupy", "vagas", "trampos", "linkedin", "wwr",
                                  "geekhunter", "querovagastech",
                                  "mentoradados", "solides", "infojobs",
-                                 "recrutei"]
+                                 "recrutei", "abler"]
     )
     output_dir: Path = DEFAULT_OUTPUT_DIR
 

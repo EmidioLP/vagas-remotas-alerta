@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em onze portais todo dia e avisa no Discord
+Norte e em Fortaleza** — em doze portais todo dia e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -56,9 +56,10 @@ portais, uma execução media 17 minutos — boa parte é do LinkedIn, que é o
 portal mais lento. Com os onze, a medição local deu 20 minutos: LinkedIn 6m30,
 Solides 3m, Quero Vagas Tech 2m10, InfoJobs 2m e o Recrutei 50s, em 24
 requisições. A página de detalhe do LinkedIn soma uns 7 minutos (100 pedidos a
-~4,5 s cada), e por isso o limite do workflow subiu de 30 para 40 minutos. Para testar antes, dispare
-pela aba Actions marcando `dry_run` — ele mostra o que enviaria sem enviar
-nada.
+~4,5 s cada), e por isso o limite do workflow subiu de 30 para 40 minutos: com
+ela, a execução completa medida em 22/09/2026 levou 24 minutos, e o Abler
+acrescenta 1m30. Para testar antes, dispare pela aba Actions marcando `dry_run`
+— ele mostra o que enviaria sem enviar nada.
 
 ## Rodando na sua máquina
 
@@ -107,6 +108,7 @@ python alerta.py
 | **Solides** | API JSON pública que o front consome, com filtros nativos de área e nível |
 | **InfoJobs** | HTML da busca, renderizado no servidor; paginação por fragmento JSON |
 | **Recrutei** | HTML das listagens por caminho; descrição do JSON-LD da página da vaga |
+| **Abler** | Sitemap e página de cada vaga, com o estado do Nuxt renderizado no servidor |
 
 ## Mentora Dados: paywall respeitado e descrição fora do card
 
@@ -383,6 +385,53 @@ outros portais já cobrem não foi medido vaga a vaga; o que se sabe do recorte 
 que são vagas de consultorias de R&S, e não de páginas de carreira nem dos
 agregadores tech que o projeto já lê.
 
+## Abler: a API fecha, o sitemap abre
+
+O Abler é um ATS: as empresas clientes publicam as vagas, e o portal de
+candidatos (`candidatos.abler.com.br`) as reúne. A API que o front usa para
+listar vagas responde **403 `ORIGIN_NOT_ALLOWED`** para quem não é o próprio
+portal ("acesse com token de integração ou pelos portais de candidatos").
+Forjar o cabeçalho `Origin` passaria, mas seria contornar um bloqueio escrito —
+então a API fica de fora.
+
+O `robots.txt` libera tudo (`Allow: /`) e aponta o `sitemap.xml`, e o caminho é
+o mesmo da GeekHunter: sitemap → filtro pelo slug → página da vaga.
+
+| Etapa (22/09/2026) | Vagas |
+|---|---|
+| Sitemap | 13.700 |
+| `lastmod` nos últimos 60 dias | 7.417 |
+| Nível de entrada no slug | 909 — seriam ~25 minutos de requisição |
+| Tecnologia no título do slug | **42** — 1m30 |
+| No aviso (remotas, ou no RN) | 5 |
+
+O corte por tecnologia usa as mesmas funções do pipeline. O preço é o mesmo da
+GeekHunter: vaga de entrada sem sinal de tecnologia no título passa batida.
+
+A página é Nuxt renderizada no servidor, e a vaga inteira vem em
+`window.__NUXT__` — um literal JavaScript, não JSON. O Nuxt troca valores
+repetidos por parâmetros de função (`a` = `null`, `d` = `true`…), e o que cada
+letra significa muda de página para página; o coletor liga parâmetros e
+argumentos antes de ler. Número sem zero antes do ponto (`salaryValue:.01`)
+também aparece, e quebrava a primeira versão do leitor em 5 de 42 páginas.
+
+O que se aproveita da página:
+
+- **Modalidade**: `workTypes` veio preenchido em 40 de 40 páginas medidas,
+  sempre com um valor só — 34 presencial, 4 remoto, 2 híbrida. É dado do portal,
+  nada é inferido.
+- **Nível: ignorado.** `levelOfInterests` marca "Analista" numa vaga Júnior,
+  "Especialista" em "Técnico de informática JR", "Consultor" em "Programador Web
+  - Trainee". O título decide, como no Quero Vagas Tech.
+- **Empresa oculta**: quando a empresa marca `hideCompany`, o nome dela vem no
+  dado mesmo assim. O coletor o descarta — a escolha de não aparecer é dela.
+- **Id**: o da página, não o número do fim do slug, que é outro (slug `637999`,
+  vaga `393184`).
+
+Os termos de uso que o próprio site linka respondem 404 (22/09/2026), e a
+política de privacidade só trata de dados de candidatos: nada encontrado proíbe
+reproduzir a vaga.
+
 ## Quero Vagas Tech, e por que a senioridade dele é ignorada
 
 Este é um agregador: ele mesmo junta vagas de outros lugares. O `robots.txt`
@@ -643,7 +692,7 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 515 testes e nenhum acessa a rede: os parsers são testados contra respostas
+São 534 testes e nenhum acessa a rede: os parsers são testados contra respostas
 reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---
