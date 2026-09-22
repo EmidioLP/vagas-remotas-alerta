@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em oito portais a cada três dias e avisa no Discord
+Norte e em Fortaleza** — em nove portais a cada três dias e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -51,10 +51,10 @@ A URL nunca entra em arquivo do repositório.
 **3. Pronto**
 
 O workflow roda sozinho a cada três dias, às 06:00 (Brasília). Uma execução com
-os oito portais leva cerca de 13 minutos, dentro do limite de 30 do workflow —
-quase metade é do LinkedIn, que é o portal mais lento. Para testar antes,
-dispare pela aba Actions marcando `dry_run` — ele mostra o que enviaria
-sem enviar nada.
+os nove portais leva cerca de 17 minutos, dentro do limite de 30 do workflow —
+boa parte é do LinkedIn, que é o portal mais lento, e uns 4 são da Solides, que
+pagina de 10 em 10. Para testar antes, dispare pela aba Actions marcando
+`dry_run` — ele mostra o que enviaria sem enviar nada.
 
 ## Rodando na sua máquina
 
@@ -100,6 +100,7 @@ python alerta.py
 | **GeekHunter** | Sitemap e páginas de vaga em HTML, com dados JobPosting |
 | **Quero Vagas Tech** | API JSON pública que o front consome, sem autenticação |
 | **Mentora Dados** | `admin-ajax` do WordPress, liberado no `robots.txt` — só vagas de dados |
+| **Solides** | API JSON pública que o front consome, com filtros nativos de área e nível |
 
 ## Mentora Dados: paywall respeitado e descrição fora do card
 
@@ -142,6 +143,60 @@ no RN), e nenhuma delas chegava pelo LinkedIn com os termos atuais. Esse número
 merece desconfiança: 95% das vagas do portal vêm do LinkedIn, e ele acrescenta o
 nível ao fim de alguns títulos ("…Engenharia de Dados Estágio"), o que impede a
 deduplicação por título idêntico.
+
+## Solides: filtros nativos no lugar dos termos de busca
+
+Portal público de um ATS. A API que o front consome é pública e sem
+autenticação, e traz a descrição completa já na listagem — não precisa de uma
+requisição por vaga, ao contrário da GeekHunter e do Quero Vagas Tech.
+
+Esta é a única fonte que **não usa os treze termos de busca do projeto**: o
+portal filtra por área e por nível no servidor, o que entrega o mesmo recorte
+com menos requisição e sem depender de casar texto. Só que vários dos filtros
+mentem, e cada um foi medido antes de virar código (21/09/2026):
+
+| Parâmetro | O que faz de verdade |
+|---|---|
+| `occupationAreas=tecnologia` | Recorta a área, com folga: traz "Vendedor Externo" e "Assistente Administrativo" junto |
+| `seniorities=junior` | Filtra: 1.103 vagas, contra 3.639 sem filtro |
+| `seniorities=estagio` | Devolve **zero** |
+| `seniorities=estagiario` / `trainee` / `aprendiz` | Devolvem as 3.639 — igualzinho a `seniorities=ValorInventadoXYZ` |
+| `title=<termo>` | Filtra (termo inventado devolve zero), casando palavra inteira |
+| `size` | Ignorado: a página é fixa em 10 |
+
+Ou seja, `seniorities` só entende `junior` e ignora o resto em silêncio. Por
+isso estágio, trainee e aprendiz entram por `title=`, e `estagio` e
+`estagiario` são buscas **separadas** — o casamento é por palavra inteira, e uma
+não cobre a outra (113 contra 119 vagas).
+
+**Aqui o nível declarado é aproveitado — o oposto do Quero Vagas Tech.** Em 150
+títulos amostrados com `seniorities=junior`, dois traziam marca de nível alto, e
+um deles era "Analista Full Stack Júnior / Pleno", título misto que este projeto
+aceita de propósito. Nas buscas por `title=`, porém, o campo fica vazio e quem
+decide é o título: isso não perde nada (em 50 títulos de `title=estagiario`, o
+regex aceitou os 50) e protege do casamento frouxo do parâmetro.
+
+A área vir generosa não é problema — é para isso que existe o portão de
+relevância, que descarta o vendedor e o assistente administrativo.
+
+**A listagem vem ordenada por data decrescente, e a coleta para no corte de
+idade.** Sem isso seriam 111 páginas de 10 no filtro mais longo; com os 60 dias
+padrão são cerca de 48. A ordenação foi conferida página a página, e a cauda
+justifica o filtro de idade do projeto: a página 111 traz vagas de 2022.
+
+Duas armadilhas a mais, as duas medidas:
+
+- o `redirectLink` que a API devolve aponta para `{empresa}.solides.jobs`,
+  subdomínio que a Solides desativou — cinco de cinco falharam na conexão. O
+  link vai para a página canônica do portal, `/vaga/{id}/{slug}`;
+- a modalidade vive em `jobType`, não em `homeOffice`: a vaga marcada "remoto"
+  veio com `homeOffice` falso.
+
+A busca por local usa `locations`, que quer a **sigla** da UF — `RN` devolve 13
+vagas, enquanto `Natal` e `Rio Grande do Norte` devolvem zero. Ela passa na
+regra do projeto: `locations=LocalQueNaoExisteXYZ` devolve nada. Como só sabe
+pedir o estado, para Fortaleza vem o Ceará inteiro — o que já está tratado, já
+que a capital não aceita a consulta como prova e exige a cidade escrita.
 
 ## Quero Vagas Tech, e por que a senioridade dele é ignorada
 
@@ -227,7 +282,8 @@ Duas decisões de segurança, ambas com teste:
 
 ## Como uma vaga é selecionada
 
-Os números ao lado são de uma execução real (17/09/2026), para dar escala:
+Os números ao lado são de uma execução real (17/09/2026), para dar escala.
+Ela é anterior à Solides, então o funil mostra oito portais:
 
 ```
 coleta nos 8 portais                                            3459
@@ -297,6 +353,7 @@ API antes de virar código:
 | **Vagas.com** | `/vagas-em-natal-rn` | `/vagas-em-fortaleza-ce` — **com** a UF |
 | **Trampos** | fica de fora (ver abaixo) | fica de fora |
 | **We Work Remotely** | fica de fora — feed de vagas remotas globais | fica de fora |
+| **Solides** | `locations=RN` — a sigla; o nome por extenso devolve zero | `locations=CE` — só sabe pedir a UF; só vale o texto |
 
 Estado e cidade não se pedem do mesmo jeito, e a diferença importa. No RN, vaga
 que vem de uma consulta por local é aceita **pela consulta** — então pedir
@@ -364,7 +421,7 @@ As regras de classificação ficam em três YAMLs comentados
 python -m pytest -q
 ```
 
-São 330 testes e nenhum acessa a rede: os parsers são testados contra respostas
+São 383 testes e nenhum acessa a rede: os parsers são testados contra respostas
 reais capturadas dos portais, guardadas dentro dos próprios testes.
 
 ---

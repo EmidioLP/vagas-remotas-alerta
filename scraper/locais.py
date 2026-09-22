@@ -21,6 +21,10 @@ API de verdade antes de virar codigo:
     ser usado para o RN porque "7 vagas viram 2" parecia filtro -- e como a
     listagem nao traz cidade, a vaga era aceita so por ter vindo da consulta.
   - **We Work Remotely**: fica de fora. O feed e de vagas remotas globais.
+  - **Solides**: `locations` com a SIGLA da UF -- `RN` devolve 13 vagas,
+    enquanto `Natal` e `Rio Grande do Norte` devolvem zero. Filtra de verdade
+    (`locations=LocalQueNaoExisteXYZ` devolve zero), mas so sabe pedir o
+    estado: para uma cidade, vem a UF inteira.
 
 Regra para qualquer local novo: so usar a consulta de um portal depois de
 provar que um local inventado devolve nada. Vaga vinda de consulta por local
@@ -67,6 +71,9 @@ class Local:
     gupy_city: str = ""
     linkedin_geo_id: str = ""
     vagas_cidades: tuple[str, ...] = ()
+    # A Solides quer a SIGLA da UF ("RN"); nome de cidade ou de estado por
+    # extenso devolve zero. Como e por UF, uma cidade traz o estado inteiro.
+    solides_uf: str = ""
 
     def reconhece(self, texto: str) -> bool:
         """O texto de localizacao do portal aponta para este local?"""
@@ -85,6 +92,7 @@ RIO_GRANDE_DO_NORTE = Local(
     gupy_state="Rio Grande do Norte",
     linkedin_geo_id="104863467",
     vagas_cidades=("natal-rn", "mossoro-rn"),
+    solides_uf="RN",
 )
 
 FORTALEZA = Local(
@@ -99,6 +107,9 @@ FORTALEZA = Local(
     gupy_city="Fortaleza",
     linkedin_geo_id="103836099",
     vagas_cidades=("fortaleza-ce",),
+    # A UF traz o Ceara inteiro, mais largo que a capital -- e por isso que
+    # `consulta_e_prova=False` acima vale tambem para esta consulta.
+    solides_uf="CE",
 )
 
 LOCAIS: dict[str, Local] = {
