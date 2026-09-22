@@ -1,4 +1,4 @@
-# Coleta vagas junior remotas a cada tres dias e avisa no Discord so as novas.
+# Coleta vagas junior remotas todo dia e avisa no Discord so as novas.
 #
 # O estado de "ja avisada" e commitado de volta ao repositorio: o runner e
 # descartado ao terminar, entao sem isso toda execucao reavisaria tudo.
@@ -11,9 +11,9 @@ name: Alertar vagas remotas
 
 on:
   schedule:
-    # A cada tres dias, 09:00 UTC = 06:00 em Brasilia. O horario e aproximado:
+    # Todo dia as 09:00 UTC = 06:00 em Brasilia. O horario e aproximado:
     # o agendador do GitHub atrasa quando a fila esta cheia.
-    - cron: "0 9 */3 * *"
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

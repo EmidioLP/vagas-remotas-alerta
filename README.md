@@ -1,7 +1,7 @@
 # vagas-remotas-alerta
 
 Bot que procura **vagas júnior remotas** — e as **presenciais no Rio Grande do
-Norte e em Fortaleza** — em nove portais a cada três dias e avisa no Discord
+Norte e em Fortaleza** — em nove portais todo dia e avisa no Discord
 **apenas as que ainda não foram mostradas**, para candidatar-se sem revisitar
 site nenhum.
 
@@ -50,7 +50,7 @@ A URL nunca entra em arquivo do repositório.
 
 **3. Pronto**
 
-O workflow roda sozinho a cada três dias, às 06:00 (Brasília). Uma execução com
+O workflow roda sozinho todo dia, às 06:00 (Brasília). Uma execução com
 os nove portais leva cerca de 17 minutos, dentro do limite de 30 do workflow —
 boa parte é do LinkedIn, que é o portal mais lento, e uns 4 são da Solides, que
 pagina de 10 em 10. Para testar antes, dispare pela aba Actions marcando
