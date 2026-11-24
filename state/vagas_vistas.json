@@ -1,6 +1,6 @@
 {
- "atualizado_em": "2026-11-23T21:04:44+00:00",
- "total": 531,
+ "atualizado_em": "2026-11-24T20:12:13+00:00",
+ "total": 536,
  "vistas": [
   "abler:385947",
   "abler:389347",
@@ -288,6 +288,9 @@
   "linkedin:4492750873",
   "linkedin:4492760135",
   "linkedin:4493680160",
+  "linkedin:4493925734",
+  "linkedin:4493971011",
+  "linkedin:4493972772",
   "mentoradados:10084",
   "mentoradados:10143",
   "mentoradados:10951",
@@ -510,6 +513,7 @@
   "solides:955253",
   "solides:955660",
   "solides:955663",
+  "solides:957450",
   "trampos:773874",
   "trampos:774266",
   "trampos:774963",
@@ -532,6 +536,7 @@
   "wwr:dln-consulting-group-data-processing-specialist-entry-level",
   "wwr:highlevel-customer-support-representative-i",
   "wwr:keeper-security-communications-intern",
-  "wwr:prismfly-product-data-analyst-internship"
+  "wwr:prismfly-product-data-analyst-internship",
+  "wwr:ritual-software-engineer-intern"
  ]
 }
